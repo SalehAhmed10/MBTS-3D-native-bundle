@@ -28,6 +28,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import Stats from 'three/addons/libs/stats.module.js';
 
 import { retarget } from './retargeter.mjs';
@@ -1193,6 +1194,7 @@ class TalkingHead {
 
     // Loader
     const loader = new GLTFLoader();
+    loader.setMeshoptDecoder( MeshoptDecoder );
 
     // Check if draco loading enabled
     if ( this.dracoEnabled ) {
