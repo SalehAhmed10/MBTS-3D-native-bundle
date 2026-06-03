@@ -4,55 +4,83 @@ import { TalkingHead } from "../modules/talkinghead.mjs";
 const avatarEl = document.getElementById("avatar");
 const statusEl = document.getElementById("status");
 const query = new URLSearchParams(window.location.search);
-
-const persons = {
-  prithi: {
-    avatar: {
-      url: "./avatars/prithi.glb",
-      body: "F",
-      avatarMood: "happy",
-      scale: 0.75,
-    },
-    view: {
-      cameraY: 1.2,
-      cameraX: 0.0,
-      cameraFOV: 5,
-      cameraRotateX: -0.2,
-      cameraRotateY: 0.0,
-      cameraRotateZ: 2,
-    },
-  },
-  camilia: {
-    avatar: {
-      url: "./avatars/Camilia.glb",
-      body: "F",
-      avatarMood: "neutral",
-      scale: 0.75,
-    },
-    view: {
-      cameraY: 1.0,
-      cameraX: 0.0,
-      cameraFOV: 6,
-      cameraRotateX: -0.1,
-      cameraRotateY: 0.0,
-      cameraRotateZ: 2,
-    },
-  },
-};
+const FALLBACK_AVATAR_KEY = "prithi";
+const AVATAR_MANIFEST_URL = new URL("./avatars/manifest.json", window.location.href).href;
+const persons = await loadAvatarManifest();
+const defaultAvatarKey = getDefaultAvatarKey();
+const avatarPreloadPromises = new Map();
 
 let head = null;
-let currentAvatarKey = normalizeAvatar(query.get("avatar") || "prithi");
+let currentAvatarKey = normalizeAvatar(query.get("avatar") || defaultAvatarKey);
 let currentMood = normalizeMood(query.get("mood") || "happy");
 let currentBackground = query.get("background") || "none";
 let speechSequence = 0;
 let ready = false;
 
+async function loadAvatarManifest() {
+  try {
+    const response = await fetch(AVATAR_MANIFEST_URL, { cache: "force-cache" });
+    if (!response.ok) {
+      throw new Error(`Avatar manifest failed with ${response.status}`);
+    }
+
+    const manifest = await response.json();
+    return manifest?.avatars || {};
+  } catch (error) {
+    console.warn("Failed to load avatar manifest, using fallback avatars", error);
+    return {
+      prithi: {
+        label: "Prithi",
+        url: "./avatars/prithi.glb",
+        body: "F",
+        defaultMood: "happy",
+        scale: 0.75,
+        view: {
+          cameraY: 1.2,
+          cameraX: 0.0,
+          cameraFOV: 5,
+          cameraRotateX: -0.2,
+          cameraRotateY: 0.0,
+          cameraRotateZ: 2,
+        },
+        voice: {
+          id: "prithi-default",
+          label: "Prithi Default",
+        },
+      },
+      camilia: {
+        label: "Camilia",
+        url: "./avatars/Camilia.glb",
+        body: "F",
+        defaultMood: "neutral",
+        scale: 0.75,
+        view: {
+          cameraY: 1.0,
+          cameraX: 0.0,
+          cameraFOV: 6,
+          cameraRotateX: -0.1,
+          cameraRotateY: 0.0,
+          cameraRotateZ: 2,
+        },
+        voice: {
+          id: "camilia-default",
+          label: "Camilia Default",
+        },
+      },
+    };
+  }
+}
+
+function getDefaultAvatarKey() {
+  return persons[FALLBACK_AVATAR_KEY] ? FALLBACK_AVATAR_KEY : Object.keys(persons)[0] || FALLBACK_AVATAR_KEY;
+}
+
 function normalizeAvatar(value) {
-  const normalized = String(value || "prithi").trim().toLowerCase();
+  const normalized = String(value || defaultAvatarKey).trim().toLowerCase();
   if (normalized === "camille") {
     return "camilia";
   }
-  return persons[normalized] ? normalized : "prithi";
+  return persons[normalized] ? normalized : defaultAvatarKey;
 }
 
 function normalizeMood(value) {
@@ -200,24 +228,25 @@ async function loadAvatar(avatarKey = currentAvatarKey) {
   }
 
   const avatarConfig = {
-    ...person.avatar,
-    avatarMood: currentMood === "suggestive" ? "love" : currentMood,
+    url: person.url,
+    body: person.body || "F",
+    avatarMood: currentMood === "suggestive" ? "love" : currentMood || person.defaultMood || "neutral",
   };
 
   await head.showAvatar(avatarConfig);
 
-  if (person.avatar.scale && head.scene) {
+  if (person.scale && head.scene) {
     head.scene.traverse((child) => {
       if (child.isMesh || child.isGroup) {
-        child.scale.multiplyScalar(person.avatar.scale);
+        child.scale.multiplyScalar(person.scale);
       }
     });
   }
 
-  head.setView(head.viewName, person.view);
+  head.setView(head.viewName, person.view || {});
   head.cameraClock = 999;
 
-  if (person.view.cameraFOV !== undefined && head.camera) {
+  if (person.view?.cameraFOV !== undefined && head.camera) {
     head.camera.fov = person.view.cameraFOV;
     head.camera.updateProjectionMatrix();
   }
@@ -226,6 +255,57 @@ async function loadAvatar(avatarKey = currentAvatarKey) {
   makeMaterialsPBR();
   applyBackground(currentBackground);
   await applyMood(currentMood);
+}
+
+function preloadAvatarAsset(avatarKey) {
+  const normalizedKey = normalizeAvatar(avatarKey);
+  if (avatarPreloadPromises.has(normalizedKey)) {
+    return avatarPreloadPromises.get(normalizedKey);
+  }
+
+  const person = persons[normalizedKey];
+  if (!person?.url) {
+    return Promise.resolve();
+  }
+
+  const preloadPromise = fetch(new URL(person.url, window.location.href).href, {
+    cache: "force-cache",
+  })
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error(`Failed to preload ${normalizedKey} with ${response.status}`);
+      }
+      return response.arrayBuffer();
+    })
+    .then(() => {
+      postToHost({
+        type: "avatar_prefetched",
+        avatar: normalizedKey,
+      });
+    })
+    .catch((error) => {
+      console.warn(`Avatar preload failed for ${normalizedKey}`, error);
+    });
+
+  avatarPreloadPromises.set(normalizedKey, preloadPromise);
+  return preloadPromise;
+}
+
+function preloadRemainingAvatars(activeAvatarKey) {
+  const preload = () => {
+    Object.keys(persons)
+      .filter((avatarKey) => avatarKey !== activeAvatarKey)
+      .forEach((avatarKey) => {
+        void preloadAvatarAsset(avatarKey);
+      });
+  };
+
+  if (typeof window.requestIdleCallback === "function") {
+    window.requestIdleCallback(preload, { timeout: 1500 });
+    return;
+  }
+
+  window.setTimeout(preload, 600);
 }
 
 function decodeBase64Audio(audioBase64) {
@@ -398,6 +478,7 @@ async function boot() {
   applyRendererSettings();
   applyBackground(currentBackground);
   await loadAvatar(currentAvatarKey);
+  preloadRemainingAvatars(currentAvatarKey);
   ready = true;
   setStatus("ready", "Avatar ready");
 
@@ -406,6 +487,11 @@ async function boot() {
     avatar: currentAvatarKey,
     mood: currentMood,
     background: currentBackground,
+    supportedAvatars: Object.entries(persons).map(([key, person]) => ({
+      id: key,
+      label: person.label || key,
+      voice: person.voice || null,
+    })),
   });
 }
 

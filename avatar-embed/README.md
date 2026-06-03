@@ -17,6 +17,19 @@ It intentionally does **not** include:
 - voice model downloads
 - local chat controls
 
+## Avatar Registry
+
+Avatars are defined in:
+
+- `avatars/manifest.json`
+
+That manifest is the right place to grow:
+
+- more models
+- default moods
+- camera framing
+- future voice metadata per avatar
+
 ## Deploy
 
 Deploy this folder as a static site.
@@ -38,6 +51,7 @@ Source and rebuild inputs kept in the repo:
 
 - `src/`
 - `modules/`
+- `avatars/manifest.json`
 
 ## App Wiring
 

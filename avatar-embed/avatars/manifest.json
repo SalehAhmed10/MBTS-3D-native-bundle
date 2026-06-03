@@ -1,0 +1,43 @@
+{
+  "defaultAvatar": "prithi",
+  "avatars": {
+    "prithi": {
+      "label": "Prithi",
+      "url": "./avatars/prithi.glb",
+      "body": "F",
+      "defaultMood": "happy",
+      "scale": 0.75,
+      "view": {
+        "cameraY": 1.2,
+        "cameraX": 0.0,
+        "cameraFOV": 5,
+        "cameraRotateX": -0.2,
+        "cameraRotateY": 0.0,
+        "cameraRotateZ": 2
+      },
+      "voice": {
+        "id": "prithi-default",
+        "label": "Prithi Default"
+      }
+    },
+    "camilia": {
+      "label": "Camilia",
+      "url": "./avatars/Camilia.glb",
+      "body": "F",
+      "defaultMood": "neutral",
+      "scale": 0.75,
+      "view": {
+        "cameraY": 1.0,
+        "cameraX": 0.0,
+        "cameraFOV": 6,
+        "cameraRotateX": -0.1,
+        "cameraRotateY": 0.0,
+        "cameraRotateZ": 2
+      },
+      "voice": {
+        "id": "camilia-default",
+        "label": "Camilia Default"
+      }
+    }
+  }
+}
