@@ -45862,6 +45862,25 @@ async function loadAvatarManifest() {
 function getDefaultAvatarKey() {
   return persons[FALLBACK_AVATAR_KEY] ? FALLBACK_AVATAR_KEY : Object.keys(persons)[0] || FALLBACK_AVATAR_KEY;
 }
+function normalizeVoiceList(person) {
+  if (Array.isArray(person?.voices) && person.voices.length > 0) {
+    return person.voices.filter((voice) => voice?.id && voice?.label);
+  }
+  if (person?.voice?.id && person?.voice?.label) {
+    return [person.voice];
+  }
+  return [];
+}
+function getDefaultVoice(person) {
+  const voices = normalizeVoiceList(person);
+  if (!voices.length) {
+    return null;
+  }
+  if (person?.defaultVoiceId) {
+    return voices.find((voice) => voice.id === person.defaultVoiceId) || voices[0];
+  }
+  return voices[0];
+}
 function normalizeAvatar(value) {
   const normalized = String(value || defaultAvatarKey).trim().toLowerCase();
   if (normalized === "camille") {
@@ -46205,7 +46224,9 @@ async function boot() {
     supportedAvatars: Object.entries(persons).map(([key, person]) => ({
       id: key,
       label: person.label || key,
-      voice: person.voice || null
+      voice: getDefaultVoice(person),
+      voices: normalizeVoiceList(person),
+      defaultVoiceId: getDefaultVoice(person)?.id || null
     }))
   });
 }

@@ -30,12 +30,16 @@ type AvatarOption = {
   label: string;
   available: boolean;
   voice?: AvatarVoiceOption | null;
+  voices?: AvatarVoiceOption[];
+  defaultVoiceId?: string | null;
 };
 
 type AvatarRuntimeDescriptor = {
   id?: string;
   label?: string;
   voice?: AvatarVoiceOption | null;
+  voices?: AvatarVoiceOption[] | null;
+  defaultVoiceId?: string | null;
 };
 
 type AvatarEvent = {
@@ -52,6 +56,13 @@ const DEFAULT_AVATAR_OPTIONS: AvatarOption[] = [
       id: "prithi-default",
       label: "Prithi Default",
     },
+    voices: [
+      {
+        id: "prithi-default",
+        label: "Prithi Default",
+      },
+    ],
+    defaultVoiceId: "prithi-default",
   },
   {
     id: "camilia",
@@ -61,6 +72,13 @@ const DEFAULT_AVATAR_OPTIONS: AvatarOption[] = [
       id: "camilia-default",
       label: "Camilia Default",
     },
+    voices: [
+      {
+        id: "camilia-default",
+        label: "Camilia Default",
+      },
+    ],
+    defaultVoiceId: "camilia-default",
   },
 ];
 
@@ -179,6 +197,9 @@ export default function HomeScreen() {
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
   const [avatarOptions, setAvatarOptions] = useState<AvatarOption[]>(DEFAULT_AVATAR_OPTIONS);
   const [selectedAvatarId, setSelectedAvatarId] = useState<string>(DEFAULT_AVATAR_ID);
+  const [selectedVoiceId, setSelectedVoiceId] = useState<string | null>(
+    DEFAULT_AVATAR_OPTIONS[0]?.defaultVoiceId || DEFAULT_AVATAR_OPTIONS[0]?.voice?.id || null
+  );
   const [selectedEmotionId, setSelectedEmotionId] = useState<(typeof EMOTION_OPTIONS)[number]["id"]>("happy");
   const [selectedBackgroundId, setSelectedBackgroundId] =
     useState<(typeof BACKGROUND_OPTIONS)[number]["id"]>("bg1.jpg");
@@ -207,7 +228,14 @@ export default function HomeScreen() {
   ]);
   const selectedAvatar =
     avatarOptions.find((avatarOption) => avatarOption.id === selectedAvatarId) || avatarOptions[0] || DEFAULT_AVATAR_OPTIONS[0];
-  const selectedVoice = selectedAvatar?.voice || null;
+  const selectedVoiceOptions =
+    (selectedAvatar?.voices && selectedAvatar.voices.length > 0 ? selectedAvatar.voices : selectedAvatar?.voice ? [selectedAvatar.voice] : []) ||
+    [];
+  const selectedVoice =
+    selectedVoiceOptions.find((voiceOption) => voiceOption.id === selectedVoiceId) ||
+    selectedAvatar?.voice ||
+    selectedVoiceOptions[0] ||
+    null;
   const selectedBackground =
     BACKGROUND_OPTIONS.find((backgroundOption) => backgroundOption.id === selectedBackgroundId) ||
     BACKGROUND_OPTIONS[0];
@@ -262,6 +290,12 @@ export default function HomeScreen() {
           label: nextLabel,
           available: true as boolean,
           voice: avatarDescriptor?.voice || null,
+          voices: Array.isArray(avatarDescriptor?.voices)
+            ? avatarDescriptor.voices.filter((voiceOption) => voiceOption?.id && voiceOption?.label)
+            : avatarDescriptor?.voice
+              ? [avatarDescriptor.voice]
+              : [],
+          defaultVoiceId: avatarDescriptor?.defaultVoiceId || avatarDescriptor?.voice?.id || null,
         } as AvatarOption;
       })
       .filter((avatarOption): avatarOption is AvatarOption => avatarOption !== null);
@@ -574,6 +608,28 @@ export default function HomeScreen() {
   }, [selectedAvatar.label]);
 
   useEffect(() => {
+    const availableVoices =
+      selectedAvatar?.voices && selectedAvatar.voices.length > 0
+        ? selectedAvatar.voices
+        : selectedAvatar?.voice
+          ? [selectedAvatar.voice]
+          : [];
+
+    if (!availableVoices.length) {
+      setSelectedVoiceId(null);
+      return;
+    }
+
+    setSelectedVoiceId((currentVoiceId) => {
+      if (currentVoiceId && availableVoices.some((voiceOption) => voiceOption.id === currentVoiceId)) {
+        return currentVoiceId;
+      }
+
+      return selectedAvatar?.defaultVoiceId || selectedAvatar?.voice?.id || availableVoices[0].id;
+    });
+  }, [selectedAvatar?.defaultVoiceId, selectedAvatar?.id, selectedAvatar?.voice, selectedAvatar?.voices]);
+
+  useEffect(() => {
     avatarWebViewRef.current?.setMood(selectedEmotionId);
   }, [selectedEmotionId]);
 
@@ -880,6 +936,28 @@ export default function HomeScreen() {
             />
 
             <Text allowFontScaling={false} style={styles.selectorLabel}>
+              Voice
+            </Text>
+            <Dropdown
+              data={selectedVoiceOptions.map((voiceOption) => ({
+                label: voiceOption.label,
+                value: voiceOption.id,
+              }))}
+              disable={selectedVoiceOptions.length <= 1}
+              labelField="label"
+              maxHeight={220}
+              onChange={(item) => setSelectedVoiceId(item.value)}
+              placeholder="Select voice"
+              selectedTextStyle={styles.dropdownSelectedText}
+              style={[
+                styles.dropdown,
+                selectedVoiceOptions.length <= 1 && styles.dropdownDisabled,
+              ]}
+              value={selectedVoice?.id || null}
+              valueField="value"
+            />
+
+            <Text allowFontScaling={false} style={styles.selectorLabel}>
               Background
             </Text>
             <Dropdown
@@ -1149,6 +1227,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     minHeight: 46,
     paddingHorizontal: 12,
+  },
+  dropdownDisabled: {
+    opacity: 0.6,
   },
   dropdownSelectedText: {
     color: "#111827",

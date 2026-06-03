@@ -15,10 +15,13 @@
         "cameraRotateY": 0.0,
         "cameraRotateZ": 2
       },
-      "voice": {
-        "id": "prithi-default",
-        "label": "Prithi Default"
-      }
+      "defaultVoiceId": "prithi-default",
+      "voices": [
+        {
+          "id": "prithi-default",
+          "label": "Prithi Default"
+        }
+      ]
     },
     "camilia": {
       "label": "Camilia",
@@ -34,10 +37,13 @@
         "cameraRotateY": 0.0,
         "cameraRotateZ": 2
       },
-      "voice": {
-        "id": "camilia-default",
-        "label": "Camilia Default"
-      }
+      "defaultVoiceId": "camilia-default",
+      "voices": [
+        {
+          "id": "camilia-default",
+          "label": "Camilia Default"
+        }
+      ]
     }
   }
 }

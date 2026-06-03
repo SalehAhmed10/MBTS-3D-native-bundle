@@ -9,9 +9,10 @@
 // API endpoints
 // ---------------------------------------------------------------------------
 
-/** Main MBTS API backend (Heroku production) */
+/** Main MBTS API backend. */
 export const MBTS_API_URL =
-  process.env.EXPO_PUBLIC_MBTS_API_URL || "https://mbts.herokuapp.com/";
+  process.env.EXPO_PUBLIC_MBTS_API_URL ||
+  "https://mbts-3d-staging-a97d3e5c7d7c.herokuapp.com/";
 
 /** Avatar speech synthesis backend (Heroku staging) */
 export const AVATAR_SPEECH_API_URL =

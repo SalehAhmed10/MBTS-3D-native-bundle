@@ -10,6 +10,11 @@ export type AvatarWebViewEvent = {
       id: string;
       label: string;
     } | null;
+    voices?: Array<{
+      id: string;
+      label: string;
+    }> | null;
+    defaultVoiceId?: string | null;
   }>;
   [key: string]: unknown;
 };
