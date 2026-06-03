@@ -20,18 +20,49 @@ import AvatarWebView from "@/components/avatar/AvatarWebView";
 import { SPEECH_SYNTHESIS_ENDPOINT } from "@/config";
 import { baseURL } from "@/utils/api";
 
-const AVATAR_OPTIONS = [
+type AvatarVoiceOption = {
+  id: string;
+  label: string;
+};
+
+type AvatarOption = {
+  id: string;
+  label: string;
+  available: boolean;
+  voice?: AvatarVoiceOption | null;
+};
+
+type AvatarRuntimeDescriptor = {
+  id?: string;
+  label?: string;
+  voice?: AvatarVoiceOption | null;
+};
+
+type AvatarEvent = {
+  type?: string;
+  supportedAvatars?: AvatarRuntimeDescriptor[];
+};
+
+const DEFAULT_AVATAR_OPTIONS: AvatarOption[] = [
   {
     id: "prithi",
     label: "Prithi",
     available: true,
+    voice: {
+      id: "prithi-default",
+      label: "Prithi Default",
+    },
   },
   {
     id: "camilia",
     label: "Camilia",
     available: true,
+    voice: {
+      id: "camilia-default",
+      label: "Camilia Default",
+    },
   },
-] as const;
+];
 
 const DEFAULT_AVATAR_ID = "prithi";
 
@@ -146,8 +177,8 @@ export default function HomeScreen() {
   } | null>(null);
   const lastDispatchedSpeechIdRef = useRef<string | null>(null);
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
-  const [selectedAvatarId, setSelectedAvatarId] =
-    useState<(typeof AVATAR_OPTIONS)[number]["id"]>(DEFAULT_AVATAR_ID);
+  const [avatarOptions, setAvatarOptions] = useState<AvatarOption[]>(DEFAULT_AVATAR_OPTIONS);
+  const [selectedAvatarId, setSelectedAvatarId] = useState<string>(DEFAULT_AVATAR_ID);
   const [selectedEmotionId, setSelectedEmotionId] = useState<(typeof EMOTION_OPTIONS)[number]["id"]>("happy");
   const [selectedBackgroundId, setSelectedBackgroundId] =
     useState<(typeof BACKGROUND_OPTIONS)[number]["id"]>("bg1.jpg");
@@ -175,7 +206,8 @@ export default function HomeScreen() {
     },
   ]);
   const selectedAvatar =
-    AVATAR_OPTIONS.find((avatarOption) => avatarOption.id === selectedAvatarId) || AVATAR_OPTIONS[0];
+    avatarOptions.find((avatarOption) => avatarOption.id === selectedAvatarId) || avatarOptions[0] || DEFAULT_AVATAR_OPTIONS[0];
+  const selectedVoice = selectedAvatar?.voice || null;
   const selectedBackground =
     BACKGROUND_OPTIONS.find((backgroundOption) => backgroundOption.id === selectedBackgroundId) ||
     BACKGROUND_OPTIONS[0];
@@ -211,8 +243,47 @@ export default function HomeScreen() {
     setSpeechQueue((currentQueue) => currentQueue.slice(1));
   }, []);
 
+  const hydrateAvatarOptions = useCallback((supportedAvatars?: AvatarRuntimeDescriptor[]) => {
+    if (!Array.isArray(supportedAvatars) || supportedAvatars.length === 0) {
+      return;
+    }
+
+    const nextAvatarOptions = supportedAvatars
+      .map((avatarDescriptor) => {
+        const nextAvatarId = String(avatarDescriptor?.id || "").trim().toLowerCase();
+        const nextLabel = String(avatarDescriptor?.label || nextAvatarId).trim();
+
+        if (!nextAvatarId || !nextLabel) {
+          return null;
+        }
+
+        return {
+          id: nextAvatarId,
+          label: nextLabel,
+          available: true as boolean,
+          voice: avatarDescriptor?.voice || null,
+        } as AvatarOption;
+      })
+      .filter((avatarOption): avatarOption is AvatarOption => avatarOption !== null);
+
+    if (!nextAvatarOptions.length) {
+      return;
+    }
+
+    setAvatarOptions(nextAvatarOptions);
+    setSelectedAvatarId((currentAvatarId) =>
+      nextAvatarOptions.some((avatarOption) => avatarOption.id === currentAvatarId)
+        ? currentAvatarId
+        : nextAvatarOptions[0].id
+    );
+  }, []);
+
   const handleAvatarEvent = useCallback(
-    (event?: { type?: string }) => {
+    (event?: AvatarEvent) => {
+      if (event?.type === "avatar_ready") {
+        hydrateAvatarOptions(event.supportedAvatars);
+      }
+
       if (event?.type === "speech_started" || event?.type === "avatar_error") {
         revealPendingSpeechMessage();
       }
@@ -221,7 +292,7 @@ export default function HomeScreen() {
         advanceSpeechQueue();
       }
     },
-    [advanceSpeechQueue, revealPendingSpeechMessage]
+    [advanceSpeechQueue, hydrateAvatarOptions, revealPendingSpeechMessage]
   );
 
   const authenticationMessage = (property: AuthProperty) => {
@@ -536,6 +607,8 @@ export default function HomeScreen() {
             text: activeSpeech.text,
             avatar: selectedAvatar.id,
             mood: selectedEmotionId,
+            voiceId: selectedVoice?.id,
+            voiceLabel: selectedVoice?.label,
           }),
         });
 
@@ -553,6 +626,8 @@ export default function HomeScreen() {
           text: activeSpeech.text,
           avatar: selectedAvatar.label,
           mood: selectedEmotionId,
+          voiceId: selectedVoice?.id,
+          voiceLabel: selectedVoice?.label,
           audioBase64: payload.audioBase64,
           words: payload.words,
           wordTimes: payload.wordTimes,
@@ -586,6 +661,8 @@ export default function HomeScreen() {
     selectedAvatar.id,
     selectedAvatar.label,
     selectedEmotionId,
+    selectedVoice?.id,
+    selectedVoice?.label,
   ]);
 
   return (
@@ -764,14 +841,14 @@ export default function HomeScreen() {
               Host
             </Text>
             <Dropdown
-              data={AVATAR_OPTIONS.map((avatarOption) => ({
+              data={avatarOptions.map((avatarOption) => ({
                 label: avatarOption.label,
                 value: avatarOption.id,
               }))}
               labelField="label"
               maxHeight={220}
               onChange={(item) => {
-                const nextAvatar = AVATAR_OPTIONS.find((avatarOption) => avatarOption.id === item.value);
+                const nextAvatar = avatarOptions.find((avatarOption) => avatarOption.id === item.value);
 
                 if (nextAvatar) {
                   setSelectedAvatarId(nextAvatar.id);

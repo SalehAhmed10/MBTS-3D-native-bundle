@@ -27,7 +27,7 @@ export const SPEECH_SYNTHESIS_ENDPOINT = `${AVATAR_SPEECH_API_URL}avatarSpeech/s
 
 /** Hosted avatar web page (Vercel deployment) */
 export const AVATAR_WEB_VIEW_URL =
-  process.env.EXPO_PUBLIC_AVATAR_WEB_VIEW_URL || "https://mbts3d-avatar.vercel.app/";
+  process.env.EXPO_PUBLIC_AVATAR_WEB_VIEW_URL || "https://mbts-3-d-native-bundle.vercel.app/";
 
 // ---------------------------------------------------------------------------
 // Feature flags / toggles
