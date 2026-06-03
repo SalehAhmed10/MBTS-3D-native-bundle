@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/build/three.module.js';
 
 // Constants
 const HIPS_HEIGHT_M = 1.037; // Reference model's hip height
