@@ -27,12 +27,17 @@ Recommended hosts:
 - Cloudflare Pages
 - S3 + CloudFront
 
-The host should serve `index.html` at the site root and preserve the relative folders:
+The host should serve `index.html` at the site root and preserve the runtime files:
 
+- `app.js`
+- `playback-worklet.js`
 - `avatars/`
 - `backgrounds/`
+
+Source and rebuild inputs kept in the repo:
+
+- `src/`
 - `modules/`
-- `vendor/`
 
 ## App Wiring
 
@@ -66,3 +71,9 @@ This is the best latency / maintainability tradeoff for the current app:
 - avatar speech backend owns TTS + viseme generation
 
 That avoids browser-side model TTS warm-up, keeps deployment simple, and reduces duplication.
+
+## Rebuild
+
+If you update the embed runtime source, regenerate the committed bundle before pushing:
+
+`npm run build:avatar-embed`
