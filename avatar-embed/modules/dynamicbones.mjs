@@ -22,7 +22,7 @@
 * SOFTWARE.
 */
 
-import * as THREE from '../vendor/three/build/three.module.js';
+import * as THREE from 'three';
 
 // Temporary variables
 let tmp,tmp2,tmp3;
