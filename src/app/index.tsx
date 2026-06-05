@@ -17,7 +17,7 @@ import { Dropdown } from "react-native-element-dropdown";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import AvatarWebView from "@/components/avatar/AvatarWebView";
-import { SPEECH_SYNTHESIS_ENDPOINT } from "@/config";
+import { SPEECH_HEALTH_ENDPOINT, SPEECH_SYNTHESIS_ENDPOINT } from "@/config";
 import { baseURL } from "@/utils/api";
 
 type AvatarVoiceOption = {
@@ -184,6 +184,25 @@ const AUTH_PROPERTIES: AuthProperty[] = [
   "mothersMaidenName",
 ];
 
+const REGISTRATION_PROMPT = "You're not registered with BOTCierge. Please register at BOTCIERGE.com.";
+const AUTH_FAILURE_PROMPT =
+  "Based on your responses, I couldn't verify your identity. Please register at BOTCIERGE.com.";
+
+const normalizeAvatarMessage = (message: string) => {
+  const trimmedMessage = message.trim();
+  const normalizedMessage = trimmedMessage.replace(/\s+/g, " ");
+
+  if (/you'?re not registered with botcierge/i.test(normalizedMessage)) {
+    return REGISTRATION_PROMPT;
+  }
+
+  if (/made a request that's a bit beyond/i.test(normalizedMessage) || /are you want to login/i.test(normalizedMessage)) {
+    return "It looks like you're trying to do something beyond registration. If you'd like to sign in, just type 'login'.";
+  }
+
+  return trimmedMessage;
+};
+
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const scrollViewRef = useRef<ScrollView>(null);
@@ -194,6 +213,7 @@ export default function HomeScreen() {
     speakAudio: (payload: Record<string, unknown>) => void;
   } | null>(null);
   const lastDispatchedSpeechIdRef = useRef<string | null>(null);
+  const hasWarmedSpeechBackendRef = useRef(false);
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
   const [avatarOptions, setAvatarOptions] = useState<AvatarOption[]>(DEFAULT_AVATAR_OPTIONS);
   const [selectedAvatarId, setSelectedAvatarId] = useState<string>(DEFAULT_AVATAR_ID);
@@ -205,7 +225,6 @@ export default function HomeScreen() {
     useState<(typeof BACKGROUND_OPTIONS)[number]["id"]>("bg1.jpg");
   const [input, setInput] = useState("");
   const [isReplying, setIsReplying] = useState(false);
-  const [pendingSpeechMessageId, setPendingSpeechMessageId] = useState<string | null>(null);
   const [chatStep, setChatStep] = useState<"name" | "intent" | "auth">("name");
   const [guestName, setGuestName] = useState("");
   const [authenticated, setAuthenticated] = useState(false);
@@ -244,13 +263,13 @@ export default function HomeScreen() {
 
   const addAvatarMessage = (message: string) => {
     const messageId = `${Date.now()}-avatar`;
+    const normalizedMessage = normalizeAvatarMessage(message);
 
-    setPendingSpeechMessageId(messageId);
     setMessages((currentMessages) => [
       ...currentMessages,
       {
         id: messageId,
-        message,
+        message: normalizedMessage,
         me: false,
       },
     ]);
@@ -258,14 +277,10 @@ export default function HomeScreen() {
       ...currentQueue,
       {
         id: messageId,
-        text: message,
+        text: normalizedMessage,
       },
     ]);
   };
-
-  const revealPendingSpeechMessage = useCallback(() => {
-    setPendingSpeechMessageId(null);
-  }, []);
 
   const advanceSpeechQueue = useCallback(() => {
     setSpeechQueue((currentQueue) => currentQueue.slice(1));
@@ -318,15 +333,11 @@ export default function HomeScreen() {
         hydrateAvatarOptions(event.supportedAvatars);
       }
 
-      if (event?.type === "speech_started" || event?.type === "avatar_error") {
-        revealPendingSpeechMessage();
-      }
-
       if (event?.type === "speech_finished" || event?.type === "avatar_error") {
         advanceSpeechQueue();
       }
     },
-    [advanceSpeechQueue, hydrateAvatarOptions, revealPendingSpeechMessage]
+    [advanceSpeechQueue, hydrateAvatarOptions]
   );
 
   const authenticationMessage = (property: AuthProperty) => {
@@ -367,7 +378,7 @@ export default function HomeScreen() {
     const responseJson = (await response.json().catch(() => ({}))) as PersonResponse;
 
     if (!response.ok || responseJson.type !== "person" || responseJson.status !== "OK" || !responseJson.data) {
-      throw new Error("Based on your responses I cannot verify your identity. Please register at BOTCIERGE.com");
+      throw new Error(AUTH_FAILURE_PROMPT);
     }
 
     const verifiedPerson = {
@@ -388,7 +399,7 @@ export default function HomeScreen() {
 
   const askNextAuthQuestion = async (candidateUsers: CandidateUser[], remainingProperties: AuthProperty[]) => {
     if (candidateUsers.length === 0) {
-      addAvatarMessage("Based on your responses I cannot verify your identity. Please register at BOTCIERGE.com");
+      addAvatarMessage(AUTH_FAILURE_PROMPT);
       resetAuthChallenge();
       return;
     }
@@ -407,7 +418,7 @@ export default function HomeScreen() {
   const handleAuthMessage = async (nextMessage: string) => {
     if (authProperties.length === AUTH_PROPERTIES.length && !currentAuthProp) {
       if (nextMessage.length > 20) {
-        addAvatarMessage("I don't understand please be more concise");
+        addAvatarMessage("I don't understand. Please be more concise.");
         return;
       }
 
@@ -426,13 +437,13 @@ export default function HomeScreen() {
           setUsers(filteredUsers);
           addAvatarMessage(`Are you ${guestName} ${filteredUsers[0].lastName} from ${filteredUsers[0].homeCity}?`);
         } else {
-          addAvatarMessage("Based on your responses I cannot verify your identity. Please register at BOTCIERGE.com");
+          addAvatarMessage(AUTH_FAILURE_PROMPT);
           resetAuthChallenge();
         }
         return;
       }
 
-      addAvatarMessage("I don't understand please be more concise");
+      addAvatarMessage("I don't understand. Please be more concise.");
       return;
     }
 
@@ -442,7 +453,7 @@ export default function HomeScreen() {
     }
 
     if (nextMessage.length > getLimit(currentAuthProp)) {
-      addAvatarMessage("I don't understand please be more concise");
+      addAvatarMessage("I don't understand. Please be more concise.");
       return;
     }
 
@@ -514,7 +525,7 @@ export default function HomeScreen() {
       }
 
       if (!responseJson.data?.length) {
-        addAvatarMessage("You're not registered with BOTCierge. Please register at BOTCIERGE.com");
+        addAvatarMessage(REGISTRATION_PROMPT);
         return;
       }
 
@@ -554,7 +565,7 @@ export default function HomeScreen() {
 
       if (nextMessage.includes(" ")) {
         const lastWord = nextMessage.split(" ").pop() || nextMessage;
-        addAvatarMessage(`${lastWord}, your name cannot contain space character`);
+        addAvatarMessage(`${lastWord}, your name cannot contain spaces.`);
         return;
       }
 
@@ -573,7 +584,7 @@ export default function HomeScreen() {
         addAvatarMessage(
           error instanceof Error
             ? error.message
-            : "Based on your responses I cannot verify your identity. Please register at BOTCIERGE.com"
+            : AUTH_FAILURE_PROMPT
         );
         resetAuthChallenge();
       } finally {
@@ -606,6 +617,37 @@ export default function HomeScreen() {
   useEffect(() => {
     avatarWebViewRef.current?.setAvatar(selectedAvatar.label);
   }, [selectedAvatar.label]);
+
+  useEffect(() => {
+    if (hasWarmedSpeechBackendRef.current) {
+      return;
+    }
+
+    hasWarmedSpeechBackendRef.current = true;
+
+    const controller = new AbortController();
+
+    const warmSpeechBackend = async () => {
+      try {
+        await fetch(SPEECH_HEALTH_ENDPOINT, {
+          method: "GET",
+          signal: controller.signal,
+        });
+      } catch (error) {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        console.log("[HomeScreen][AvatarWebView][speech-warmup-error]", error);
+      }
+    };
+
+    void warmSpeechBackend();
+
+    return () => {
+      controller.abort();
+    };
+  }, []);
 
   useEffect(() => {
     const availableVoices =
@@ -652,8 +694,6 @@ export default function HomeScreen() {
 
     const run = async () => {
       try {
-        revealPendingSpeechMessage();
-
         const response = await fetch(SPEECH_SYNTHESIS_ENDPOINT, {
           method: "POST",
           headers: {
@@ -699,7 +739,6 @@ export default function HomeScreen() {
 
         console.log("[HomeScreen][AvatarWebView][speech-error]", error);
         lastDispatchedSpeechIdRef.current = null;
-        revealPendingSpeechMessage();
         advanceSpeechQueue();
       }
     };
@@ -713,7 +752,6 @@ export default function HomeScreen() {
     activeSpeech?.id,
     activeSpeech?.text,
     advanceSpeechQueue,
-    revealPendingSpeechMessage,
     selectedAvatar.id,
     selectedAvatar.label,
     selectedEmotionId,
@@ -799,8 +837,6 @@ export default function HomeScreen() {
             contentContainerStyle={styles.chatContent}
           >
             {messages.map((message) => {
-              const isPendingSpeech = !message.me && pendingSpeechMessageId === message.id;
-
               return (
                 <View
                   key={message.id}
@@ -821,13 +857,28 @@ export default function HomeScreen() {
                       allowFontScaling={false}
                       style={[styles.bubbleText, message.me ? styles.myBubbleText : styles.avatarBubbleText]}
                     >
-                      {isPendingSpeech ? "..." : message.message}
+                      {message.message}
                     </Text>
                   </View>
                 </View>
               );
             })}
           </ScrollView>
+
+          {isReplying ? (
+            <View style={[styles.messageRow, styles.avatarMessageRow, styles.typingRow]}>
+              <View style={styles.avatarBadge}>
+                <Text allowFontScaling={false} style={styles.avatarBadgeText}>
+                  {selectedAvatar.label.charAt(0)}
+                </Text>
+              </View>
+              <View style={[styles.bubble, styles.avatarBubble, styles.typingBubble]}>
+                <Text allowFontScaling={false} style={[styles.bubbleText, styles.avatarBubbleText]}>
+                  {selectedAvatar.label} is typing...
+                </Text>
+              </View>
+            </View>
+          ) : null}
 
           <View style={styles.inputBar}>
             <TextInput
@@ -1088,6 +1139,9 @@ const styles = StyleSheet.create({
   myMessageRow: {
     justifyContent: "flex-end",
   },
+  typingRow: {
+    paddingHorizontal: 12,
+  },
   avatarBadge: {
     alignItems: "center",
     backgroundColor: "#f0ecfb",
@@ -1113,6 +1167,9 @@ const styles = StyleSheet.create({
   avatarBubble: {
     backgroundColor: "#ECECEC",
     borderBottomLeftRadius: 4,
+  },
+  typingBubble: {
+    opacity: 0.9,
   },
   myBubble: {
     backgroundColor: "#4F8DBF",

@@ -22,6 +22,9 @@ export const AVATAR_SPEECH_API_URL =
 /** Convenience: full speech synthesis endpoint path */
 export const SPEECH_SYNTHESIS_ENDPOINT = `${AVATAR_SPEECH_API_URL}avatarSpeech/synthesize`;
 
+/** Cheap health endpoint used to warm the Heroku dyno and TTS worker early. */
+export const SPEECH_HEALTH_ENDPOINT = `${AVATAR_SPEECH_API_URL}avatarSpeech/health`;
+
 // ---------------------------------------------------------------------------
 // Avatar web view
 // ---------------------------------------------------------------------------
