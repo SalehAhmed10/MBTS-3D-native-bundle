@@ -17,8 +17,9 @@ import { Dropdown } from "react-native-element-dropdown";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import AvatarWebView from "@/components/avatar/AvatarWebView";
-import { SPEECH_HEALTH_ENDPOINT, SPEECH_SYNTHESIS_ENDPOINT } from "@/config";
+import { SPEECH_SYNTHESIS_ENDPOINT } from "@/config";
 import { baseURL } from "@/utils/api";
+import { cacheSpeech, getCachedSpeech } from "@/utils/speechCache";
 
 type AvatarVoiceOption = {
   id: string;
@@ -213,7 +214,6 @@ export default function HomeScreen() {
     speakAudio: (payload: Record<string, unknown>) => void;
   } | null>(null);
   const lastDispatchedSpeechIdRef = useRef<string | null>(null);
-  const hasWarmedSpeechBackendRef = useRef(false);
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
   const [avatarOptions, setAvatarOptions] = useState<AvatarOption[]>(DEFAULT_AVATAR_OPTIONS);
   const [selectedAvatarId, setSelectedAvatarId] = useState<string>(DEFAULT_AVATAR_ID);
@@ -619,37 +619,6 @@ export default function HomeScreen() {
   }, [selectedAvatar.label]);
 
   useEffect(() => {
-    if (hasWarmedSpeechBackendRef.current) {
-      return;
-    }
-
-    hasWarmedSpeechBackendRef.current = true;
-
-    const controller = new AbortController();
-
-    const warmSpeechBackend = async () => {
-      try {
-        await fetch(SPEECH_HEALTH_ENDPOINT, {
-          method: "GET",
-          signal: controller.signal,
-        });
-      } catch (error) {
-        if (controller.signal.aborted) {
-          return;
-        }
-
-        console.log("[HomeScreen][AvatarWebView][speech-warmup-error]", error);
-      }
-    };
-
-    void warmSpeechBackend();
-
-    return () => {
-      controller.abort();
-    };
-  }, []);
-
-  useEffect(() => {
     const availableVoices =
       selectedAvatar?.voices && selectedAvatar.voices.length > 0
         ? selectedAvatar.voices
@@ -694,24 +663,33 @@ export default function HomeScreen() {
 
     const run = async () => {
       try {
-        const response = await fetch(SPEECH_SYNTHESIS_ENDPOINT, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            text: activeSpeech.text,
-            avatar: selectedAvatar.id,
-            mood: selectedEmotionId,
-            voiceId: selectedVoice?.id,
-            voiceLabel: selectedVoice?.label,
-          }),
-        });
+        const cached = await getCachedSpeech(activeSpeech.text, selectedAvatar.id, selectedVoice?.id);
 
-        const payload = await response.json().catch(() => ({}));
+        let payload = cached;
 
-        if (!response.ok) {
-          throw new Error(payload?.error || payload?.message || `Avatar speech service failed with ${response.status}`);
+        if (!payload) {
+          const response = await fetch(SPEECH_SYNTHESIS_ENDPOINT, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              text: activeSpeech.text,
+              avatar: selectedAvatar.id,
+              mood: selectedEmotionId,
+              voiceId: selectedVoice?.id,
+              voiceLabel: selectedVoice?.label,
+            }),
+          });
+
+          const responsePayload = await response.json().catch(() => ({}));
+
+          if (!response.ok) {
+            throw new Error(responsePayload?.error || responsePayload?.message || `Avatar speech service failed with ${response.status}`);
+          }
+
+          payload = responsePayload;
+          cacheSpeech(activeSpeech.text, selectedAvatar.id, selectedVoice?.id, responsePayload);
         }
 
         if (isCancelled) {
@@ -724,13 +702,13 @@ export default function HomeScreen() {
           mood: selectedEmotionId,
           voiceId: selectedVoice?.id,
           voiceLabel: selectedVoice?.label,
-          audioBase64: payload.audioBase64,
-          words: payload.words,
-          wordTimes: payload.wordTimes,
-          wordDurations: payload.wordDurations,
-          visemes: payload.visemes,
-          visemeTimes: payload.visemeTimes,
-          visemeDurations: payload.visemeDurations,
+          audioBase64: payload!.audioBase64,
+          words: payload!.words,
+          wordTimes: payload!.wordTimes,
+          wordDurations: payload!.wordDurations,
+          visemes: payload!.visemes,
+          visemeTimes: payload!.visemeTimes,
+          visemeDurations: payload!.visemeDurations,
         });
       } catch (error) {
         if (isCancelled) {
@@ -754,6 +732,50 @@ export default function HomeScreen() {
     advanceSpeechQueue,
     selectedAvatar.id,
     selectedAvatar.label,
+    selectedEmotionId,
+    selectedVoice?.id,
+    selectedVoice?.label,
+  ]);
+
+  // TASK-11: While item[0] is speaking, prefetch TTS for item[1] so it plays instantly on queue advance.
+  const nextSpeech = speechQueue[1] ?? null;
+  useEffect(() => {
+    if (!nextSpeech?.text) return;
+
+    let isCancelled = false;
+
+    const prefetch = async () => {
+      const cached = await getCachedSpeech(nextSpeech.text, selectedAvatar.id, selectedVoice?.id);
+      if (cached || isCancelled) return;
+
+      try {
+        const response = await fetch(SPEECH_SYNTHESIS_ENDPOINT, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            text: nextSpeech.text,
+            avatar: selectedAvatar.id,
+            mood: selectedEmotionId,
+            voiceId: selectedVoice?.id,
+            voiceLabel: selectedVoice?.label,
+          }),
+        });
+        if (!response.ok || isCancelled) return;
+        const payload = await response.json().catch(() => null);
+        if (payload && !isCancelled) {
+          cacheSpeech(nextSpeech.text, selectedAvatar.id, selectedVoice?.id, payload);
+        }
+      } catch {
+        // prefetch best-effort, ignore errors
+      }
+    };
+
+    void prefetch();
+    return () => { isCancelled = true; };
+  }, [
+    nextSpeech?.id,
+    nextSpeech?.text,
+    selectedAvatar.id,
     selectedEmotionId,
     selectedVoice?.id,
     selectedVoice?.label,

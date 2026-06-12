@@ -77,6 +77,50 @@
       <div id="avatar"></div>
       <div id="status" data-state="loading">Loading avatar runtime...</div>
     </main>
+    <!-- Polyfill: Android WebView blocks fetch() for file:// URIs; XHR works with allowFileAccessFromFileURLs -->
+    <script>
+      (function () {
+        if (typeof window === 'undefined' || typeof window.location === 'undefined') return;
+        if (!window.location.href.startsWith('file://')) return;
+
+        var _nativeFetch = window.fetch.bind(window);
+
+        window.fetch = function (input, init) {
+          var url = typeof input === 'string' ? input : (input && input.url ? input.url : String(input));
+          if (!url.startsWith('file://')) return _nativeFetch(input, init);
+
+          return new Promise(function (resolve, reject) {
+            var xhr = new XMLHttpRequest();
+            xhr.open((init && init.method) || 'GET', url, true);
+            xhr.responseType = 'arraybuffer';
+
+            if (init && init.headers) {
+              var headers = init.headers;
+              if (headers.forEach) {
+                headers.forEach(function (v, k) { xhr.setRequestHeader(k, v); });
+              } else {
+                Object.keys(headers).forEach(function (k) { xhr.setRequestHeader(k, headers[k]); });
+              }
+            }
+
+            xhr.onload = function () {
+              var status = xhr.status === 0 ? 200 : xhr.status;
+              var buf = xhr.response;
+              var body = buf instanceof ArrayBuffer ? buf : new ArrayBuffer(0);
+              resolve(new Response(body, {
+                status: status,
+                headers: { 'Content-Type': xhr.getResponseHeader('Content-Type') || '' }
+              }));
+            };
+
+            xhr.onerror = function () { reject(new TypeError('fetch failed: ' + url)); };
+            xhr.onabort = function () { reject(new DOMException('Aborted', 'AbortError')); };
+
+            xhr.send(init && init.body ? init.body : null);
+          });
+        };
+      })();
+    </script>
     <script type="module" src="./app.js"></script>
   </body>
 </html>

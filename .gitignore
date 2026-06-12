@@ -48,5 +48,8 @@ example
 .planning/
 .commandcode/
 
+# generated android assets (built by build-avatar-embed.mjs, ~16MB GLBs)
+android-local-assets/
+
 # local screenshots
 mbts-*.png

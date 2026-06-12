@@ -10,6 +10,7 @@ import {
   buildAvatarBridgeMessage,
   buildAvatarInjection,
   buildAvatarWebViewUrl,
+  bundledAvatarWebViewUrl,
   defaultAvatarWebViewUrl,
   normalizeAvatarName,
   summarizeAvatarBridgePayload,
@@ -128,6 +129,12 @@ const AvatarWebView = forwardRef(
     const webViewRef = useRef(null);
     const isReadyRef = useRef(false);
     const pendingMessagesRef = useRef([]);
+    const loadStartRef = useRef(null);
+    const t = (label) => {
+      const now = Date.now();
+      const elapsed = loadStartRef.current ? `+${now - loadStartRef.current}ms` : 'T+0';
+      console.log(`[AVT] ${elapsed} ${label}`);
+    };
     const [isReady, setIsReady] = useState(false);
     const [statusLabel, setStatusLabel] = useState('loading');
     const [resolvedSourceUrl, setResolvedSourceUrl] = useState(() => {
@@ -135,7 +142,9 @@ const AvatarWebView = forwardRef(
         return sourceUrl;
       }
 
-      return Platform.OS === 'android' ? null : defaultAvatarWebViewUrl(Platform.OS);
+      return Platform.OS === 'android'
+        ? bundledAvatarWebViewUrl(Platform.OS)
+        : defaultAvatarWebViewUrl(Platform.OS);
     });
     const avatarSourceUrl = buildAvatarWebViewUrl(
       Platform.OS,
@@ -250,7 +259,7 @@ const AvatarWebView = forwardRef(
         };
       }
 
-      setResolvedSourceUrl(defaultAvatarWebViewUrl(Platform.OS));
+      setResolvedSourceUrl(bundledAvatarWebViewUrl(Platform.OS));
 
       return () => {
         isMounted = false;
@@ -290,15 +299,18 @@ const AvatarWebView = forwardRef(
               background,
             )}
             onLoadStart={() => {
+              loadStartRef.current = Date.now();
               isReadyRef.current = false;
               setIsReady(false);
               setStatusLabel('loading');
+              t('webview_load_start');
               reportEvent({
                 type: 'webview_load_start',
                 uri: avatarSourceUrl,
               });
             }}
             onLoadEnd={() => {
+              t('webview_load_end (HTML parsed)');
               webViewRef.current?.injectJavaScript(
                 buildEmbedBootstrapScript(avatar, background),
               );
@@ -321,6 +333,7 @@ const AvatarWebView = forwardRef(
                 const payload = JSON.parse(event.nativeEvent.data);
 
                 if (payload?.type === 'avatar_ready') {
+                  t('avatar_ready (3D loaded, speech can start)');
                   isReadyRef.current = true;
                   setIsReady(true);
                   setStatusLabel('ready');
@@ -328,8 +341,10 @@ const AvatarWebView = forwardRef(
                 }
 
                 if (payload?.type === 'speech_started') {
+                  t('speech_started');
                   setStatusLabel('speaking');
                 } else if (payload?.type === 'speech_finished') {
+                  t('speech_finished');
                   setStatusLabel('ready');
                 } else if (payload?.type === 'avatar_error') {
                   setStatusLabel('error');

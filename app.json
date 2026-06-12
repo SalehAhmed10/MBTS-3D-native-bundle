@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "MBTS-3D-native-spike",
-    "slug": "MBTS-3D-native-spike",
+    "name": "MBTS 3D",
+    "slug": "mbts-3d",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "mbts3dnativespike",
+    "scheme": "mbts3d",
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon"
@@ -19,7 +19,11 @@
       },
       "predictiveBackGestureEnabled": false,
       "softwareKeyboardLayoutMode": "resize",
-      "package": "com.ebidaemma.MBTS3Dnativespike"
+      "package": "com.mbts.botcierge",
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "output": "static",
@@ -37,7 +41,7 @@
           }
         }
       ],
-      "expo-audio"
+      ["expo-audio", { "recordAudioAndroid": false, "microphonePermission": false }]
     ],
     "experiments": {
       "typedRoutes": true,
