@@ -45,7 +45,6 @@ example
 /android
 
 # local planning / tooling
-.planning/
 .commandcode/
 
 # generated android assets (built by build-avatar-embed.mjs, ~16MB GLBs)
