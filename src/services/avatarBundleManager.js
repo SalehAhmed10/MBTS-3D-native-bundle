@@ -85,33 +85,44 @@ export async function isAvatarGlbCached(avatarId) {
 
 // Downloads one avatar GLB with progress. No-ops if already cached.
 // onProgress(0..1) is called during download.
-export function downloadAvatarGlb(avatarId, onProgress) {
+export async function downloadAvatarGlb(avatarId, onProgress) {
   const rel = AVATAR_GLBS[avatarId];
-  if (!rel) return Promise.resolve();
+  if (!rel) return;
 
   const localUri = LOCAL_DIR + rel;
   const remoteUri = BASE_URL + rel;
 
-  return FileSystem.getInfoAsync(localUri).then(info => {
-    if (info.exists) return;
+  await ensureDir(LOCAL_DIR + 'avatars/');
 
-    if (!onProgress) {
-      return FileSystem.downloadAsync(remoteUri, localUri);
-    }
+  const info = await FileSystem.getInfoAsync(localUri);
+  if (info.exists) return;
 
-    return new Promise((resolve, reject) => {
-      const task = FileSystem.createDownloadResumable(
-        remoteUri,
-        localUri,
-        {},
-        ({ totalBytesWritten, totalBytesExpectedToWrite }) => {
-          if (totalBytesExpectedToWrite > 0) {
-            onProgress(totalBytesWritten / totalBytesExpectedToWrite);
-          }
-        },
-      );
-      task.downloadAsync().then(resolve).catch(reject);
-    });
+  if (!onProgress) {
+    await FileSystem.downloadAsync(remoteUri, localUri);
+    return;
+  }
+
+  await new Promise((resolve, reject) => {
+    const task = FileSystem.createDownloadResumable(
+      remoteUri,
+      localUri,
+      {},
+      ({ totalBytesWritten, totalBytesExpectedToWrite }) => {
+        if (totalBytesExpectedToWrite > 0) {
+          onProgress(totalBytesWritten / totalBytesExpectedToWrite);
+        }
+      },
+    );
+    task.downloadAsync().then(resolve).catch(reject);
+  });
+}
+
+// Preloads all avatar GLBs in the background (fire-and-forget).
+export function preloadAllGlbs() {
+  Object.keys(AVATAR_GLBS).forEach(avatarId => {
+    isAvatarGlbCached(avatarId).then(cached => {
+      if (!cached) downloadAvatarGlb(avatarId);
+    }).catch(() => {});
   });
 }
 

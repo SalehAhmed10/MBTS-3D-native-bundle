@@ -20,6 +20,7 @@ import {
   getLocalBundleUri,
   isBundleCached,
   isAvatarGlbCached,
+  preloadAllGlbs,
 } from '../../services/avatarBundleManager';
 
 let NativeWebView = null;
@@ -278,6 +279,7 @@ const AvatarWebView = forwardRef(
             setDownloadProgress(1);
             setStatusLabel('loading');
             setResolvedSourceUrl(getLocalBundleUri());
+            preloadAllGlbs(); // background download remaining GLBs
           }
         } catch (err) {
           console.warn('[AvatarWebView] bundle prep failed, falling back to hosted URL', err?.message || err);
