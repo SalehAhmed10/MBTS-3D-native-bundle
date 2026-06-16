@@ -1,28 +1,6 @@
 {
-  "defaultAvatar": "prithi",
+  "defaultAvatar": "camilia",
   "avatars": {
-    "prithi": {
-      "label": "Prithi",
-      "url": "./avatars/prithi.glb",
-      "body": "F",
-      "defaultMood": "happy",
-      "scale": 0.75,
-      "view": {
-        "cameraY": 1.2,
-        "cameraX": 0.0,
-        "cameraFOV": 5,
-        "cameraRotateX": -0.2,
-        "cameraRotateY": 0.0,
-        "cameraRotateZ": 2
-      },
-      "defaultVoiceId": "prithi-default",
-      "voices": [
-        {
-          "id": "prithi-default",
-          "label": "Prithi Default"
-        }
-      ]
-    },
     "camilia": {
       "label": "Camilia",
       "url": "./avatars/Camilia.glb",
@@ -30,19 +8,73 @@
       "defaultMood": "neutral",
       "scale": 0.75,
       "view": {
-        "cameraY": 1.0,
+        "cameraY": -0.7,
         "cameraX": 0.0,
-        "cameraFOV": 6,
+        "cameraFOV": 10,
         "cameraRotateX": -0.1,
         "cameraRotateY": 0.0,
         "cameraRotateZ": 2
       },
       "defaultVoiceId": "camilia-default",
       "voices": [
-        {
-          "id": "camilia-default",
-          "label": "Camilia Default"
-        }
+        { "id": "camilia-default", "label": "Camilia Default", "kokoro": "af_bella" }
+      ]
+    },
+    "prithi": {
+      "label": "Prithi",
+      "url": "./avatars/prithi.glb",
+      "body": "F",
+      "defaultMood": "happy",
+      "scale": 0.75,
+      "view": {
+        "cameraY": 0.1,
+        "cameraX": 0.0,
+        "cameraFOV": 10,
+        "cameraRotateX": -0.1,
+        "cameraRotateY": 0.0,
+        "cameraRotateZ": 2
+      },
+      "defaultVoiceId": "prithi-default",
+      "voices": [
+        { "id": "prithi-default", "label": "Prithi Default", "kokoro": "ef_dora" }
+      ]
+    },
+    "benjamin": {
+      "label": "Benjamin",
+      "url": "./avatars/Benji.glb",
+      "body": "M",
+      "defaultMood": "neutral",
+      "scale": 0.75,
+      "view": {
+        "cameraY": 0.1,
+        "cameraX": 0.0,
+        "cameraFOV": 10,
+        "cameraRotateX": -0.1,
+        "cameraRotateY": 0.0,
+        "cameraRotateZ": 2
+      },
+      "defaultVoiceId": "benjamin-default",
+      "voices": [
+        { "id": "benjamin-default", "label": "Benjamin Default", "kokoro": "am_fenrir" }
+      ]
+    },
+    "john": {
+      "label": "John",
+      "url": "./avatars/john.glb",
+      "body": "M",
+      "defaultMood": "neutral",
+      "scale": 0.75,
+      "view": {
+        "cameraY": 0.1,
+        "cameraX": 0.0,
+        "cameraFOV": 10,
+        "cameraRotateX": -0.1,
+        "cameraRotateY": 0.0,
+        "cameraRotateZ": 2
+      },
+      "defaultVoiceId": "john-default",
+      "voices": [
+        { "id": "john-default", "label": "John Default", "kokoro": "am_fenrir" }
       ]
     }
   }
