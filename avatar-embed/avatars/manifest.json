@@ -8,9 +8,9 @@
       "defaultMood": "neutral",
       "scale": 0.75,
       "view": {
-        "cameraY": -0.7,
+        "cameraY": 1.0,
         "cameraX": 0.0,
-        "cameraFOV": 10,
+        "cameraFOV": 6,
         "cameraRotateX": -0.1,
         "cameraRotateY": 0.0,
         "cameraRotateZ": 2
@@ -27,10 +27,10 @@
       "defaultMood": "happy",
       "scale": 0.75,
       "view": {
-        "cameraY": 0.1,
+        "cameraY": 1.2,
         "cameraX": 0.0,
-        "cameraFOV": 10,
-        "cameraRotateX": -0.1,
+        "cameraFOV": 5,
+        "cameraRotateX": -0.2,
         "cameraRotateY": 0.0,
         "cameraRotateZ": 2
       },

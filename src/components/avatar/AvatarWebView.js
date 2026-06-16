@@ -14,7 +14,6 @@ import {
   normalizeAvatarName,
   summarizeAvatarBridgePayload,
 } from './avatarBridge';
-
 import {
   downloadAvatarGlb,
   downloadCoreBundle,
@@ -266,9 +265,7 @@ const AvatarWebView = forwardRef(
 
           const glbCached = await isAvatarGlbCached(initialAvatar);
           if (!glbCached) {
-            if (!cancelled) {
-              setStatusLabel('downloading');
-            }
+            if (!cancelled) setStatusLabel('downloading');
             await downloadAvatarGlb(initialAvatar, p => {
               if (!cancelled) setDownloadProgress(0.6 + p * 0.4);
             });
@@ -281,7 +278,6 @@ const AvatarWebView = forwardRef(
           }
         } catch (_err) {
           if (!cancelled) {
-            // Fall back to hosted URL so the app still works when offline download fails.
             setStatusLabel('loading');
             setResolvedSourceUrl(defaultAvatarWebViewUrl('hosted'));
           }
@@ -292,16 +288,6 @@ const AvatarWebView = forwardRef(
       return () => { cancelled = true; };
     }, [sourceUrl]);
 
-    if (!NativeWebView) {
-      return (
-        <View style={[styles.container, styles.fallback, style]}>
-          <Text style={styles.fallbackText}>
-            Install `react-native-webview` to enable the talking avatar panel.
-          </Text>
-        </View>
-      );
-    }
-
     if (statusLabel === 'downloading') {
       const pct = Math.round(downloadProgress * 100);
       return (
@@ -311,6 +297,16 @@ const AvatarWebView = forwardRef(
             <View style={[styles.progressFill, { width: `${pct}%` }]} />
           </View>
           <Text style={styles.downloadPct}>{pct}%</Text>
+        </View>
+      );
+    }
+
+    if (!NativeWebView) {
+      return (
+        <View style={[styles.container, styles.fallback, style]}>
+          <Text style={styles.fallbackText}>
+            Install `react-native-webview` to enable the talking avatar panel.
+          </Text>
         </View>
       );
     }

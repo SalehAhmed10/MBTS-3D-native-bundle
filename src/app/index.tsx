@@ -2,9 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Image,
   ImageBackground,
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,11 +11,14 @@ import {
   View,
   type ImageSourcePropType,
 } from "react-native";
+import Animated, { useAnimatedKeyboard, useAnimatedStyle } from "react-native-reanimated";
 import { Dropdown } from "react-native-element-dropdown";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { StatusBar } from "expo-status-bar";
 import AvatarWebView from "@/components/avatar/AvatarWebView";
 import { SPEECH_SYNTHESIS_ENDPOINT } from "@/config";
+import { mmkvStorage } from "@/redux/storage/storage";
 import { baseURL } from "@/utils/api";
 import { cacheSpeech, getCachedSpeech } from "@/utils/speechCache";
 
@@ -50,22 +51,6 @@ type AvatarEvent = {
 
 const DEFAULT_AVATAR_OPTIONS: AvatarOption[] = [
   {
-    id: "prithi",
-    label: "Prithi",
-    available: true,
-    voice: {
-      id: "prithi-default",
-      label: "Prithi Default",
-    },
-    voices: [
-      {
-        id: "prithi-default",
-        label: "Prithi Default",
-      },
-    ],
-    defaultVoiceId: "prithi-default",
-  },
-  {
     id: "camilia",
     label: "Camilia",
     available: true,
@@ -81,9 +66,25 @@ const DEFAULT_AVATAR_OPTIONS: AvatarOption[] = [
     ],
     defaultVoiceId: "camilia-default",
   },
+  {
+    id: "prithi",
+    label: "Prithi",
+    available: true,
+    voice: {
+      id: "prithi-default",
+      label: "Prithi Default",
+    },
+    voices: [
+      {
+        id: "prithi-default",
+        label: "Prithi Default",
+      },
+    ],
+    defaultVoiceId: "prithi-default",
+  },
 ];
 
-const DEFAULT_AVATAR_ID = "prithi";
+const DEFAULT_AVATAR_ID = "camilia";
 
 const buildHelloMessage = (avatarName: string) =>
   `Hello, I'm ${avatarName}. What's your name?\nPlease enter it below.`;
@@ -97,44 +98,28 @@ const EMOTION_OPTIONS = [
   { id: "love", label: "Love" },
 ] as const;
 
-const BACKGROUND_OPTIONS = [
-  {
-    id: "none",
-    label: "None",
-    color: "#ffffff",
-    source: undefined,
-  },
-  {
-    id: "bg1.jpg",
-    label: "bg1",
-    color: "#f4f0ff",
-    source: require("../../assets/avatar-backgrounds/bg1.jpg"),
-  },
-  {
-    id: "bg2.jpg",
-    label: "bg2",
-    color: "#eef7ff",
-    source: require("../../assets/avatar-backgrounds/bg2.jpg"),
-  },
-  {
-    id: "bg3.jpg",
-    label: "bg3",
-    color: "#fff7ed",
-    source: require("../../assets/avatar-backgrounds/bg3.jpg"),
-  },
-  {
-    id: "bg4.jpg",
-    label: "bg4",
-    color: "#f8fafc",
-    source: require("../../assets/avatar-backgrounds/bg4.jpg"),
-  },
-  {
-    id: "bg5.jpg",
-    label: "bg5",
-    color: "#f8fafc",
-    source: require("../../assets/avatar-backgrounds/bg5.jpg"),
-  },
-] as const;
+const BACKGROUND_OPTIONS: Array<{
+  id: string;
+  label: string;
+  color: string;
+  source: ImageSourcePropType | undefined;
+  category: "none" | "scenes" | "cities";
+}> = [
+  { id: "none",            label: "None",      color: "#ffffff", source: undefined,                                                                                         category: "none" },
+  { id: "bg1.jpg",         label: "Scene 1",   color: "#f4f0ff", source: require("../../assets/avatar-backgrounds/bg1.jpg") as ImageSourcePropType,                        category: "scenes" },
+  { id: "bg2.jpg",         label: "Scene 2",   color: "#eef7ff", source: require("../../assets/avatar-backgrounds/bg2.jpg") as ImageSourcePropType,                        category: "scenes" },
+  { id: "bg3.jpg",         label: "Scene 3",   color: "#fff7ed", source: require("../../assets/avatar-backgrounds/bg3.jpg") as ImageSourcePropType,                        category: "scenes" },
+  { id: "bg4.jpg",         label: "Scene 4",   color: "#f8fafc", source: require("../../assets/avatar-backgrounds/bg4.jpg") as ImageSourcePropType,                        category: "scenes" },
+  { id: "bg5.jpg",         label: "Scene 5",   color: "#f8fafc", source: require("../../assets/avatar-backgrounds/bg5.jpg") as ImageSourcePropType,                        category: "scenes" },
+  { id: "bg_spaceship.jpg",label: "Spaceship", color: "#0d0d1a", source: require("../../assets/avatar-backgrounds/bg_spaceship.jpg") as ImageSourcePropType,                category: "scenes" },
+  { id: "bg_nyc2.jpg",     label: "New York",  color: "#e8f0f8", source: require("../../assets/avatar-backgrounds/bg_nyc2.jpg") as ImageSourcePropType,                    category: "cities" },
+  { id: "bg_dubai.jpg",    label: "Dubai",     color: "#fdf5e6", source: require("../../assets/avatar-backgrounds/bg_dubai.jpg") as ImageSourcePropType,                   category: "cities" },
+  { id: "bg_hongkong.jpg", label: "Hong Kong", color: "#f0f4f8", source: require("../../assets/avatar-backgrounds/bg_hongkong.jpg") as ImageSourcePropType,                category: "cities" },
+  { id: "bg_beijing.jpg",  label: "Beijing",   color: "#fef3e8", source: require("../../assets/avatar-backgrounds/bg_beijing.jpg") as ImageSourcePropType,                 category: "cities" },
+  { id: "bg_munich.jpg",   label: "Munich",    color: "#f0f6ee", source: require("../../assets/avatar-backgrounds/bg_munich.jpg") as ImageSourcePropType,                  category: "cities" },
+  { id: "bg_glasgow.jpg",  label: "Glasgow",   color: "#edf2f8", source: require("../../assets/avatar-backgrounds/bg_glasgow.jpg") as ImageSourcePropType,                 category: "cities" },
+  { id: "bg_honolulu.jpg", label: "Honolulu",  color: "#e8f6f8", source: require("../../assets/avatar-backgrounds/bg_honolulu.jpg") as ImageSourcePropType,                category: "cities" },
+];
 
 type ChatMessage = {
   id: string;
@@ -206,6 +191,8 @@ const normalizeAvatarMessage = (message: string) => {
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
+  const keyboard = useAnimatedKeyboard({ isStatusBarTranslucentAndroid: true, isNavigationBarTranslucentAndroid: true });
+  const keyboardSpacerStyle = useAnimatedStyle(() => ({ height: keyboard.height.value }));
   const scrollViewRef = useRef<ScrollView>(null);
   const avatarWebViewRef = useRef<{
     setAvatar: (avatar: string) => void;
@@ -221,8 +208,11 @@ export default function HomeScreen() {
     DEFAULT_AVATAR_OPTIONS[0]?.defaultVoiceId || DEFAULT_AVATAR_OPTIONS[0]?.voice?.id || null
   );
   const [selectedEmotionId, setSelectedEmotionId] = useState<(typeof EMOTION_OPTIONS)[number]["id"]>("happy");
-  const [selectedBackgroundId, setSelectedBackgroundId] =
-    useState<(typeof BACKGROUND_OPTIONS)[number]["id"]>("bg1.jpg");
+  const [selectedBackgroundId, setSelectedBackgroundId] = useState<string>(() => {
+    const persisted = mmkvStorage.getString('selectedBackgroundId');
+    return (persisted && BACKGROUND_OPTIONS.some(opt => opt.id === persisted)) ? persisted : 'bg_munich.jpg';
+  });
+  const [activeBgCategory, setActiveBgCategory] = useState<"scenes" | "cities" | null>(null);
   const [input, setInput] = useState("");
   const [isReplying, setIsReplying] = useState(false);
   const [chatStep, setChatStep] = useState<"name" | "intent" | "auth">("name");
@@ -235,14 +225,14 @@ export default function HomeScreen() {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "hello",
-      message: buildHelloMessage("Prithi"),
+      message: buildHelloMessage("Camille"),
       me: false,
     },
   ]);
   const [speechQueue, setSpeechQueue] = useState<SpeechQueueItem[]>([
     {
       id: "hello",
-      text: buildHelloMessage("Prithi"),
+      text: buildHelloMessage("Camille"),
     },
   ]);
   const selectedAvatar =
@@ -391,7 +381,7 @@ export default function HomeScreen() {
     resetAuthChallenge();
     addAvatarMessage("I have successfully verified your identity. How may I assist you?");
 
-    if (verifiedPerson.user?.avatarName && verifiedPerson.user.avatarName !== "Prithi") {
+    if (verifiedPerson.user?.avatarName && verifiedPerson.user.avatarName !== "Camilia") {
       addAvatarMessage(`I see you've chosen ${verifiedPerson.user.avatarName} to be your host`);
       addAvatarMessage(`Bye ${guestName}. ${verifiedPerson.user.avatarName} will take care of you from here :)`);
     }
@@ -640,9 +630,14 @@ export default function HomeScreen() {
     });
   }, [selectedAvatar?.defaultVoiceId, selectedAvatar?.id, selectedAvatar?.voice, selectedAvatar?.voices]);
 
+
   useEffect(() => {
     avatarWebViewRef.current?.setMood(selectedEmotionId);
   }, [selectedEmotionId]);
+
+  useEffect(() => {
+    mmkvStorage.setString('selectedBackgroundId', selectedBackgroundId);
+  }, [selectedBackgroundId]);
 
   useEffect(() => {
     avatarWebViewRef.current?.setBackground(selectedBackgroundId);
@@ -782,11 +777,8 @@ export default function HomeScreen() {
   ]);
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={0}
-      style={styles.screen}
-    >
+    <View style={styles.screen}>
+      <StatusBar style="dark" />
       <View
         style={[
           styles.content,
@@ -818,9 +810,6 @@ export default function HomeScreen() {
                 </Text>
               </View>
             </View>
-            <Text allowFontScaling={false} style={styles.headerIcon}>
-              ⌄
-            </Text>
           </View>
 
           <View style={[styles.avatarPanel, { backgroundColor: selectedBackground.color }]}>
@@ -934,6 +923,7 @@ export default function HomeScreen() {
               </Text>
             </Pressable>
           </View>
+          <Animated.View style={keyboardSpacerStyle} />
         </View>
       </View>
       <Modal
@@ -1033,31 +1023,55 @@ export default function HomeScreen() {
             <Text allowFontScaling={false} style={styles.selectorLabel}>
               Background
             </Text>
-            <Dropdown
-              data={BACKGROUND_OPTIONS.map((backgroundOption) => ({
-                label: backgroundOption.label,
-                value: backgroundOption.id,
-              }))}
-              labelField="label"
-              maxHeight={260}
-              onChange={(item) => setSelectedBackgroundId(item.value)}
-              placeholder="Select background"
-              renderLeftIcon={() =>
-                selectedBackgroundSource ? (
-                  <Image source={selectedBackgroundSource} style={styles.dropdownThumbnail} />
-                ) : (
-                  <View style={styles.dropdownEmptyThumbnail} />
-                )
-              }
-              selectedTextStyle={styles.dropdownSelectedText}
-              style={styles.dropdown}
-              value={selectedBackgroundId}
-              valueField="value"
-            />
+            <View style={styles.bgCategoryRow}>
+              <Pressable
+                onPress={() => setActiveBgCategory((c) => (c === "scenes" ? null : "scenes"))}
+                style={[styles.bgCategoryBtn, activeBgCategory === "scenes" && styles.bgCategoryBtnActive]}
+              >
+                <Text allowFontScaling={false} style={[styles.bgCategoryBtnText, activeBgCategory === "scenes" && styles.bgCategoryBtnTextActive]}>
+                  🎬 Scenes
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setActiveBgCategory((c) => (c === "cities" ? null : "cities"))}
+                style={[styles.bgCategoryBtn, activeBgCategory === "cities" && styles.bgCategoryBtnActive]}
+              >
+                <Text allowFontScaling={false} style={[styles.bgCategoryBtnText, activeBgCategory === "cities" && styles.bgCategoryBtnTextActive]}>
+                  🌆 Cities
+                </Text>
+              </Pressable>
+            </View>
+            {activeBgCategory !== null && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.bgGallery}
+                contentContainerStyle={styles.bgGalleryContent}
+              >
+                {activeBgCategory === "scenes" && (
+                  <Pressable onPress={() => setSelectedBackgroundId("none")} style={styles.bgThumbWrap}>
+                    <View style={[styles.bgThumb, styles.bgNoneThumb, selectedBackgroundId === "none" && styles.bgThumbSelected]}>
+                      <Text allowFontScaling={false} style={styles.bgNoneText}>✕</Text>
+                    </View>
+                    <Text allowFontScaling={false} numberOfLines={1} style={styles.bgThumbLabel}>None</Text>
+                  </Pressable>
+                )}
+                {BACKGROUND_OPTIONS.filter((opt) => opt.category === activeBgCategory).map((bg) => (
+                  <Pressable key={bg.id} onPress={() => setSelectedBackgroundId(bg.id)} style={styles.bgThumbWrap}>
+                    {bg.source ? (
+                      <Image source={bg.source} style={[styles.bgThumb, selectedBackgroundId === bg.id && styles.bgThumbSelected]} />
+                    ) : (
+                      <View style={[styles.bgThumb, styles.bgNoneThumb, selectedBackgroundId === bg.id && styles.bgThumbSelected]} />
+                    )}
+                    <Text allowFontScaling={false} numberOfLines={1} style={styles.bgThumbLabel}>{bg.label}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            )}
           </Pressable>
         </Pressable>
       </Modal>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -1119,14 +1133,11 @@ const styles = StyleSheet.create({
     color: "#22c55e",
     fontSize: 12,
   },
-  headerIcon: {
-    color: "#333333",
-    fontSize: 24,
-    opacity: 0.7,
-  },
   avatarPanel: {
     backgroundColor: "#ffffff",
     height: 260,
+    flexShrink: 1,
+    minHeight: 120,
     overflow: "hidden",
     position: "relative",
   },
@@ -1314,21 +1325,70 @@ const styles = StyleSheet.create({
     color: "#111827",
     fontSize: 14,
   },
-  dropdownThumbnail: {
-    borderColor: "#d1d5db",
-    borderRadius: 6,
-    borderWidth: 1,
-    height: 28,
-    marginRight: 8,
-    width: 36,
+  bgCategoryRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 4,
   },
-  dropdownEmptyThumbnail: {
-    backgroundColor: "#ffffff",
+  bgCategoryBtn: {
+    alignItems: "center",
+    backgroundColor: "#f9fafb",
     borderColor: "#d1d5db",
-    borderRadius: 6,
+    borderRadius: 8,
     borderWidth: 1,
-    height: 28,
-    marginRight: 8,
-    width: 36,
+    flex: 1,
+    paddingVertical: 8,
+  },
+  bgCategoryBtnActive: {
+    backgroundColor: "#7c3aed",
+    borderColor: "#7c3aed",
+  },
+  bgCategoryBtnText: {
+    color: "#374151",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  bgCategoryBtnTextActive: {
+    color: "#ffffff",
+  },
+  bgGallery: {
+    marginBottom: 4,
+  },
+  bgGalleryContent: {
+    gap: 12,
+    paddingHorizontal: 4,
+    paddingVertical: 8,
+  },
+  bgThumbWrap: {
+    alignItems: "center",
+    width: 64,
+  },
+  bgThumb: {
+    borderColor: "transparent",
+    borderRadius: 32,
+    borderWidth: 2,
+    height: 56,
+    overflow: "hidden",
+    width: 56,
+  },
+  bgThumbSelected: {
+    borderColor: "#7c3aed",
+    borderWidth: 3,
+  },
+  bgNoneThumb: {
+    alignItems: "center",
+    backgroundColor: "#f3f4f6",
+    justifyContent: "center",
+  },
+  bgNoneText: {
+    color: "#9ca3af",
+    fontSize: 20,
+  },
+  bgThumbLabel: {
+    color: "#6b7280",
+    fontSize: 10,
+    marginTop: 4,
+    textAlign: "center",
+    width: 64,
   },
 });

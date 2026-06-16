@@ -2,7 +2,7 @@ import * as FileSystem from 'expo-file-system';
 import { AVATAR_WEB_VIEW_URL } from '@/config';
 
 // Bump this string whenever avatar-web content changes (forces re-download on next launch).
-const BUNDLE_VERSION = '1.1.0';
+const BUNDLE_VERSION = '1.1.1';
 
 const BASE_URL = AVATAR_WEB_VIEW_URL.endsWith('/')
   ? AVATAR_WEB_VIEW_URL
