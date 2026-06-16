@@ -10,11 +10,18 @@ import {
   buildAvatarBridgeMessage,
   buildAvatarInjection,
   buildAvatarWebViewUrl,
-  bundledAvatarWebViewUrl,
   defaultAvatarWebViewUrl,
   normalizeAvatarName,
   summarizeAvatarBridgePayload,
 } from './avatarBridge';
+
+import {
+  downloadAvatarGlb,
+  downloadCoreBundle,
+  getLocalBundleUri,
+  isBundleCached,
+  isAvatarGlbCached,
+} from '../../services/avatarBundleManager';
 
 let NativeWebView = null;
 
@@ -125,11 +132,12 @@ const buildEmbedBootstrapScript = (avatarName, backgroundId = 'none') => `
 `;
 
 const AvatarWebView = forwardRef(
-  ({ avatar = 'Prithi', background = 'none', onAvatarEvent, sourceUrl, style }, ref) => {
+  ({ avatar = 'Camilia', background = 'none', onAvatarEvent, sourceUrl, style }, ref) => {
     const webViewRef = useRef(null);
     const isReadyRef = useRef(false);
     const pendingMessagesRef = useRef([]);
     const loadStartRef = useRef(null);
+    const initialAvatarRef = useRef(normalizeAvatarName(avatar));
     const t = (label) => {
       const now = Date.now();
       const elapsed = loadStartRef.current ? `+${now - loadStartRef.current}ms` : 'T+0';
@@ -137,18 +145,12 @@ const AvatarWebView = forwardRef(
     };
     const [isReady, setIsReady] = useState(false);
     const [statusLabel, setStatusLabel] = useState('loading');
-    const [resolvedSourceUrl, setResolvedSourceUrl] = useState(() => {
-      if (sourceUrl) {
-        return sourceUrl;
-      }
-
-      return Platform.OS === 'android'
-        ? bundledAvatarWebViewUrl(Platform.OS)
-        : defaultAvatarWebViewUrl(Platform.OS);
-    });
+    const [downloadProgress, setDownloadProgress] = useState(0);
+    const [resolvedSourceUrl, setResolvedSourceUrl] = useState(sourceUrl || null);
     const avatarSourceUrl = buildAvatarWebViewUrl(
       Platform.OS,
       resolvedSourceUrl || defaultAvatarWebViewUrl(Platform.OS),
+      initialAvatarRef.current,
     );
 
     const reportEvent = payload => {
@@ -243,27 +245,51 @@ const AvatarWebView = forwardRef(
     }, [avatar, background, isReady]);
 
     useEffect(() => {
-      let isMounted = true;
-
       if (sourceUrl) {
         setResolvedSourceUrl(sourceUrl);
-        return () => {
-          isMounted = false;
-        };
+        return;
       }
 
-      if (Platform.OS !== 'android') {
-        setResolvedSourceUrl(defaultAvatarWebViewUrl(Platform.OS));
-        return () => {
-          isMounted = false;
-        };
+      let cancelled = false;
+      const initialAvatar = normalizeAvatarName(initialAvatarRef.current);
+
+      async function prepareBundle() {
+        try {
+          const cached = await isBundleCached();
+          if (!cached) {
+            setStatusLabel('downloading');
+            setDownloadProgress(0);
+            await downloadCoreBundle(p => {
+              if (!cancelled) setDownloadProgress(p * 0.6);
+            });
+          }
+
+          const glbCached = await isAvatarGlbCached(initialAvatar);
+          if (!glbCached) {
+            if (!cancelled) {
+              setStatusLabel('downloading');
+            }
+            await downloadAvatarGlb(initialAvatar, p => {
+              if (!cancelled) setDownloadProgress(0.6 + p * 0.4);
+            });
+          }
+
+          if (!cancelled) {
+            setDownloadProgress(1);
+            setStatusLabel('loading');
+            setResolvedSourceUrl(getLocalBundleUri());
+          }
+        } catch (_err) {
+          if (!cancelled) {
+            // Fall back to hosted URL so the app still works when offline download fails.
+            setStatusLabel('loading');
+            setResolvedSourceUrl(defaultAvatarWebViewUrl('hosted'));
+          }
+        }
       }
 
-      setResolvedSourceUrl(bundledAvatarWebViewUrl(Platform.OS));
-
-      return () => {
-        isMounted = false;
-      };
+      prepareBundle();
+      return () => { cancelled = true; };
     }, [sourceUrl]);
 
     if (!NativeWebView) {
@@ -272,6 +298,19 @@ const AvatarWebView = forwardRef(
           <Text style={styles.fallbackText}>
             Install `react-native-webview` to enable the talking avatar panel.
           </Text>
+        </View>
+      );
+    }
+
+    if (statusLabel === 'downloading') {
+      const pct = Math.round(downloadProgress * 100);
+      return (
+        <View style={[styles.container, styles.downloadContainer, style]}>
+          <Text style={styles.downloadText}>Preparing avatar…</Text>
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressFill, { width: `${pct}%` }]} />
+          </View>
+          <Text style={styles.downloadPct}>{pct}%</Text>
         </View>
       );
     }
@@ -386,6 +425,33 @@ const styles = StyleSheet.create({
     color: '#5b4d7a',
     fontSize: 14,
     textAlign: 'center',
+  },
+  downloadContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f6f3fb',
+    gap: 12,
+  },
+  downloadText: {
+    color: '#5b4d7a',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  progressTrack: {
+    width: '60%',
+    height: 4,
+    backgroundColor: '#ddd',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#208AEF',
+    borderRadius: 2,
+  },
+  downloadPct: {
+    color: '#999',
+    fontSize: 12,
   },
 });
 

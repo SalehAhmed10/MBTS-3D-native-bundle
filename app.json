@@ -18,7 +18,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "softwareKeyboardLayoutMode": "resize",
+      "softwareKeyboardLayoutMode": "pan",
+
       "package": "com.mbts.botcierge",
       "blockedPermissions": [
         "android.permission.SYSTEM_ALERT_WINDOW",
@@ -30,6 +31,7 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      "./plugins/with-adjust-nothing",
       "expo-router",
       [
         "expo-splash-screen",

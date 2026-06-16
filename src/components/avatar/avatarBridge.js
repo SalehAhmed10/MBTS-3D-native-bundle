@@ -12,37 +12,34 @@ const AVATAR_ID_MAP = {
 };
 
 // Runtime contract:
-// - Android WebView loads the bundled avatar page from native assets
-// - iOS/Web load the hosted avatar page until they have their own bundle path
-// - The avatar page decides its speech path from the speechMode query param
-// - service mode requires a live backend speech endpoint
+// - Both Android and iOS load the avatar page from the local bundle cache
+//   (FileSystem.documentDirectory/avatar-web/), downloaded on first launch.
+// - avatarBundleManager handles download, caching, and version checks.
+// - The avatar page decides its speech path from the speechMode query param.
+// - service mode requires a live backend speech endpoint.
+// - Falls back to the hosted URL only when the local bundle is not ready.
 const hostedAvatarWebViewUrl = AVATAR_WEB_VIEW_URL;
 
-export const defaultDevAvatarWebViewUrl = platform => hostedAvatarWebViewUrl;
+export const defaultAvatarWebViewUrl = _platform => hostedAvatarWebViewUrl;
 
-export const bundledAvatarWebViewUrl = platform =>
-  platform === 'android'
-    ? 'file:///android_asset/avatar-web/index.html'
-    : defaultDevAvatarWebViewUrl(platform);
-
-export const defaultAvatarWebViewUrl = platform =>
-  defaultDevAvatarWebViewUrl(platform);
-
-export const buildAvatarWebViewUrl = (platform, baseUrl) => {
+export const buildAvatarWebViewUrl = (platform, baseUrl, initialAvatar) => {
   const provider = getSpeechProviderConfig(platform);
   const url = new URL(baseUrl || defaultAvatarWebViewUrl(platform));
   url.searchParams.set('speechMode', provider.mode);
   url.searchParams.set('embed', '1');
+  if (initialAvatar) {
+    url.searchParams.set('avatar', normalizeAvatarName(initialAvatar));
+  }
   return url.toString();
 };
 
 export const normalizeAvatarName = avatarName => {
-  const normalizedName = String(avatarName || 'prithi').trim().toLowerCase();
+  const normalizedName = String(avatarName || 'camilia').trim().toLowerCase();
   return AVATAR_NAME_MAP[normalizedName] || normalizedName;
 };
 
 export const denormalizeAvatarName = avatarName => {
-  const normalizedName = String(avatarName || 'prithi').trim().toLowerCase();
+  const normalizedName = String(avatarName || 'camilia').trim().toLowerCase();
   return AVATAR_ID_MAP[normalizedName] || normalizedName;
 };
 
