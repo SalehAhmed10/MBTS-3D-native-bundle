@@ -7,7 +7,7 @@ const AVATAR_NAME_MAP = {
 };
 
 const AVATAR_ID_MAP = {
-  camilia: 'Camilia',
+  camilia: 'Camille',
   prithi: 'Prithi',
 };
 

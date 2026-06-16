@@ -33,7 +33,7 @@ try {
 const buildEmbedBootstrapScript = (avatarName, backgroundId = 'none') => `
   (function () {
     var avatar = ${JSON.stringify(normalizeAvatarName(avatarName))};
-    var desiredLabel = avatar === 'camilia' ? 'Camilia' : 'Prithi';
+    var desiredLabel = avatar === 'camilia' ? 'Camille' : avatar === 'prithi' ? 'Prithi' : avatar === 'benjamin' ? 'Benjamin' : 'John';
     var background = ${JSON.stringify(backgroundId || 'none')};
 
     function hideDemoChrome() {
@@ -211,10 +211,12 @@ const AvatarWebView = forwardRef(
         });
       },
       setAvatar(nextAvatar) {
-        sendPayload({
-          type: 'setAvatar',
-          avatar: normalizeAvatarName(nextAvatar),
-        });
+        const normalizedAvatar = normalizeAvatarName(nextAvatar);
+        const payload = { type: 'setAvatar', avatar: normalizedAvatar };
+        isAvatarGlbCached(normalizedAvatar)
+          .then(cached => cached ? null : downloadAvatarGlb(normalizedAvatar))
+          .then(() => sendPayload(payload))
+          .catch(err => console.warn('[AvatarWebView] GLB download failed for', normalizedAvatar, err?.message));
       },
       setMood(mood) {
         sendPayload({ type: 'setMood', mood: mood || 'neutral' });
@@ -255,6 +257,7 @@ const AvatarWebView = forwardRef(
       async function prepareBundle() {
         try {
           const cached = await isBundleCached();
+          console.log('[AvatarWebView] bundle cached:', cached);
           if (!cached) {
             setStatusLabel('downloading');
             setDownloadProgress(0);
@@ -276,7 +279,8 @@ const AvatarWebView = forwardRef(
             setStatusLabel('loading');
             setResolvedSourceUrl(getLocalBundleUri());
           }
-        } catch (_err) {
+        } catch (err) {
+          console.warn('[AvatarWebView] bundle prep failed, falling back to hosted URL', err?.message || err);
           if (!cancelled) {
             setStatusLabel('loading');
             setResolvedSourceUrl(defaultAvatarWebViewUrl('hosted'));

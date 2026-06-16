@@ -52,16 +52,16 @@ type AvatarEvent = {
 const DEFAULT_AVATAR_OPTIONS: AvatarOption[] = [
   {
     id: "camilia",
-    label: "Camilia",
+    label: "Camille",
     available: true,
     voice: {
       id: "camilia-default",
-      label: "Camilia Default",
+      label: "Camille Default",
     },
     voices: [
       {
         id: "camilia-default",
-        label: "Camilia Default",
+        label: "Camille Default",
       },
     ],
     defaultVoiceId: "camilia-default",
@@ -210,7 +210,9 @@ export default function HomeScreen() {
   const [selectedEmotionId, setSelectedEmotionId] = useState<(typeof EMOTION_OPTIONS)[number]["id"]>("happy");
   const [selectedBackgroundId, setSelectedBackgroundId] = useState<string>(() => {
     const persisted = mmkvStorage.getString('selectedBackgroundId');
-    return (persisted && BACKGROUND_OPTIONS.some(opt => opt.id === persisted)) ? persisted : 'bg_munich.jpg';
+    // bg1-5.jpg are not in the CDN bundle — migrate stale persisted values to Munich.
+    const CDN_BACKGROUNDS = new Set(['none', 'bg_beijing.jpg', 'bg_dubai.jpg', 'bg_glasgow.jpg', 'bg_hongkong.jpg', 'bg_honolulu.jpg', 'bg_munich.jpg', 'bg_nyc2.jpg', 'bg_spaceship.jpg']);
+    return (persisted && CDN_BACKGROUNDS.has(persisted)) ? persisted : 'bg_munich.jpg';
   });
   const [activeBgCategory, setActiveBgCategory] = useState<"scenes" | "cities" | null>(null);
   const [input, setInput] = useState("");

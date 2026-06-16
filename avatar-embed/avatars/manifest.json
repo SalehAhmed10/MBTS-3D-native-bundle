@@ -2,7 +2,7 @@
   "defaultAvatar": "camilia",
   "avatars": {
     "camilia": {
-      "label": "Camilia",
+      "label": "Camille",
       "url": "./avatars/Camilia.glb",
       "body": "F",
       "defaultMood": "neutral",
@@ -46,9 +46,9 @@
       "defaultMood": "neutral",
       "scale": 0.75,
       "view": {
-        "cameraY": 0.1,
+        "cameraY": 1.0,
         "cameraX": 0.0,
-        "cameraFOV": 10,
+        "cameraFOV": 6,
         "cameraRotateX": -0.1,
         "cameraRotateY": 0.0,
         "cameraRotateZ": 2
@@ -65,9 +65,9 @@
       "defaultMood": "neutral",
       "scale": 0.75,
       "view": {
-        "cameraY": 0.1,
+        "cameraY": 1.0,
         "cameraX": 0.0,
-        "cameraFOV": 10,
+        "cameraFOV": 6,
         "cameraRotateX": -0.1,
         "cameraRotateY": 0.0,
         "cameraRotateZ": 2

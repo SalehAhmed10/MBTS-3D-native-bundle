@@ -1,8 +1,8 @@
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { AVATAR_WEB_VIEW_URL } from '@/config';
 
 // Bump this string whenever avatar-web content changes (forces re-download on next launch).
-const BUNDLE_VERSION = '1.1.1';
+const BUNDLE_VERSION = '1.2.0';
 
 const BASE_URL = AVATAR_WEB_VIEW_URL.endsWith('/')
   ? AVATAR_WEB_VIEW_URL
@@ -73,8 +73,14 @@ export async function downloadCoreBundle(onProgress) {
 export async function isAvatarGlbCached(avatarId) {
   const rel = AVATAR_GLBS[avatarId];
   if (!rel) return false;
-  const info = await FileSystem.getInfoAsync(LOCAL_DIR + rel);
-  return info.exists;
+  const info = await FileSystem.getInfoAsync(LOCAL_DIR + rel, { size: true });
+  if (!info.exists || (info.size !== undefined && info.size < 50000)) {
+    if (info.exists) {
+      await FileSystem.deleteAsync(LOCAL_DIR + rel, { idempotent: true });
+    }
+    return false;
+  }
+  return true;
 }
 
 // Downloads one avatar GLB with progress. No-ops if already cached.

@@ -75,7 +75,8 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "build:avatar-embed": "node ./scripts/build-avatar-embed.mjs"
+    "build:avatar-embed": "node ./scripts/build-avatar-embed.mjs",
+    "dev:avatar": "npx serve avatar-embed -p 8090 --cors"
   },
   "private": true
 }

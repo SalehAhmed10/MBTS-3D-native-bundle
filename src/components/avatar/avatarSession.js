@@ -10,5 +10,5 @@ export const resolveInitialAvatarName = ({
     return persistedAvatar;
   }
 
-  return 'Prithi';
+  return 'Camille';
 };
