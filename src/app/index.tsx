@@ -157,6 +157,20 @@ type IntentResponse = {
   newMessage?: string;
 };
 
+type ChatApiResponse = {
+  reply?: string;
+  emotion?: string;
+  type?: string;
+  modalType?: string | null;
+  data?: CandidateUser[] | null;
+  srxState?: unknown;
+};
+
+type ConversationTurn = {
+  role: 'user' | 'assistant';
+  content: string;
+};
+
 type PersonResponse = {
   status?: string;
   type?: string;
@@ -224,6 +238,10 @@ export default function HomeScreen() {
   const [users, setUsers] = useState<CandidateUser[]>([]);
   const [authProperties, setAuthProperties] = useState<AuthProperty[]>(AUTH_PROPERTIES);
   const [currentAuthProp, setCurrentAuthProp] = useState<AuthProperty | null>(null);
+  const [conversationHistory, setConversationHistory] = useState<ConversationTurn[]>([
+    { role: 'assistant', content: buildHelloMessage("Camille") },
+  ]);
+  const [srxState, setSrxState] = useState<unknown>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "hello",
@@ -458,61 +476,53 @@ export default function HomeScreen() {
     await askNextAuthQuestion(filteredUsers, authProperties);
   };
 
-  const sendRequestMessage = async (nextMessage: string) => {
-    const response = await fetch(`${baseURL}requests/requestHandler`, {
-      method: "POST",
+  const sendChatMessage = async (nextMessage: string) => {
+    const updatedHistory: ConversationTurn[] = [
+      ...conversationHistory,
+      { role: 'user', content: nextMessage },
+    ];
+
+    const response = await fetch('https://www.chatcamille.ai/api/chat', {
+      method: 'POST',
       headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        srx: {
-          _id: person?._id,
-          email: person?.email,
-          intent: nextMessage.toLowerCase(),
-          packages: person?.user?.packages || [],
-          isAiMessage: false,
-        },
+        message: nextMessage,
+        avatar: selectedAvatar.label,
+        userId: person?._id || null,
+        userName: guestName || 'Guest',
+        sessionName: guestName || 'Guest',
+        authenticated,
+        conversationHistory: updatedHistory,
+        packages: person?.user?.packages || [],
+        srxState,
+        srxType: null,
       }),
     });
 
-    const responseJson = (await response.json().catch(() => ({}))) as IntentResponse;
+    const responseJson = (await response.json().catch(() => ({}))) as ChatApiResponse;
 
     if (!response.ok) {
-      throw new Error(responseJson?.message || `BOTCierge request failed with ${response.status}`);
+      throw new Error(`BOTCierge request failed with ${response.status}`);
     }
 
-    if (responseJson.newMessage) {
-      addAvatarMessage(responseJson.newMessage);
+    const reply = normalizeAvatarMessage(responseJson.reply || 'I received that, but I do not have a response yet.');
+
+    if (responseJson.srxState !== undefined) {
+      setSrxState(responseJson.srxState);
     }
 
-    addAvatarMessage(responseJson.message || "I received that, but I do not have a response yet.");
-  };
+    setConversationHistory([...updatedHistory, { role: 'assistant', content: reply }]);
 
-  const sendIntentMessage = async (nextMessage: string) => {
-    const response = await fetch(`${baseURL}intents/intentHandler`, {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        srx: {
-          firstName: guestName || "Guest",
-          speechInput: nextMessage.toLowerCase(),
-        },
-      }),
-    });
-
-    const responseJson = (await response.json().catch(() => ({}))) as IntentResponse;
-
-    if (!response.ok) {
-      throw new Error(responseJson?.message || `BOTCierge request failed with ${response.status}`);
+    if (responseJson.emotion) {
+      avatarWebViewRef.current?.setMood(responseJson.emotion);
     }
 
-    if (responseJson.type === "authentication") {
+    if (responseJson.type === 'authentication') {
       if (authenticated) {
-        addAvatarMessage("You're already logged in.");
+        addAvatarMessage('You\'re already logged in.');
         return;
       }
 
@@ -521,15 +531,15 @@ export default function HomeScreen() {
         return;
       }
 
-      setUsers(responseJson.data);
+      setUsers(responseJson.data as CandidateUser[]);
       setAuthProperties(AUTH_PROPERTIES);
       setCurrentAuthProp(null);
       setChatStep("auth");
-      addAvatarMessage(`Are you ${guestName} ${responseJson.data[0].lastName} from ${responseJson.data[0].homeCity}?`);
+      addAvatarMessage(`Are you ${guestName} ${(responseJson.data as CandidateUser[])[0].lastName} from ${(responseJson.data as CandidateUser[])[0].homeCity}?`);
       return;
     }
 
-    addAvatarMessage(responseJson.message || "I received that, but I do not have a response yet.");
+    addAvatarMessage(reply);
   };
 
   const sendMessage = async () => {
@@ -589,11 +599,7 @@ export default function HomeScreen() {
     setIsReplying(true);
 
     try {
-      if (authenticated) {
-        await sendRequestMessage(nextMessage);
-      } else {
-        await sendIntentMessage(nextMessage);
-      }
+      await sendChatMessage(nextMessage);
     } catch (error) {
       const message =
         error instanceof Error

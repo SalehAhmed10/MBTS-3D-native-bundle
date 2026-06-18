@@ -47,6 +47,6 @@ export const FEATURES = {
 // Defaults
 // ---------------------------------------------------------------------------
 
-export const DEFAULT_AVATAR_ID = "prithi";
+export const DEFAULT_AVATAR_ID = "camilia";
 export const DEFAULT_SPEECH_TEXT =
-  "Hello, I am Prithi. What is your name?";
+  "Hello, I am Camille. What is your name?";
