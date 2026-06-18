@@ -612,9 +612,6 @@ export default function HomeScreen() {
     }
   };
 
-  useEffect(() => {
-    avatarWebViewRef.current?.setAvatar(selectedAvatar.label);
-  }, [selectedAvatar.label]);
 
   useEffect(() => {
     const availableVoices =

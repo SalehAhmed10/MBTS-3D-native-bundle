@@ -94,8 +94,11 @@ export async function downloadAvatarGlb(avatarId, onProgress) {
 
   await ensureDir(LOCAL_DIR + 'avatars/');
 
-  const info = await FileSystem.getInfoAsync(localUri);
-  if (info.exists) return;
+  const info = await FileSystem.getInfoAsync(localUri, { size: true });
+  if (info.exists && (info.size === undefined || info.size >= 50000)) return;
+  if (info.exists) {
+    await FileSystem.deleteAsync(localUri, { idempotent: true });
+  }
 
   if (!onProgress) {
     await FileSystem.downloadAsync(remoteUri, localUri);

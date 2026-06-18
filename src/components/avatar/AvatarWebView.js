@@ -239,10 +239,11 @@ const AvatarWebView = forwardRef(
       );
 
       if (isReady) {
-        sendPayload({
-          type: 'setAvatar',
-          avatar: normalizeAvatarName(avatar),
-        });
+        const normalizedAvatar = normalizeAvatarName(avatar);
+        isAvatarGlbCached(normalizedAvatar)
+          .then(cached => cached ? null : downloadAvatarGlb(normalizedAvatar))
+          .then(() => sendPayload({ type: 'setAvatar', avatar: normalizedAvatar }))
+          .catch(err => console.warn('[AvatarWebView] GLB download failed for', normalizedAvatar, err?.message));
       }
     }, [avatar, background, isReady]);
 
