@@ -1,202 +1,156 @@
 # Technology Stack
 
-**Analysis Date:** 2026-06-15
+**Analysis Date:** 2026-07-03
 
 ## Languages
 
 **Primary:**
-- TypeScript ~6.0.3 — all new source under `src/` (strict mode, `checkJs: false` for JS files)
-- JavaScript — legacy screens and components (`src/screens/Home.js`, redux slices, avatar embed)
+- TypeScript - Application logic (`.ts`, `.tsx` files throughout `src/`)
+- JavaScript - Configuration and build scripts
 
 **Secondary:**
-- Kotlin — Android native layer (applied via `org.jetbrains.kotlin.android` Gradle plugin)
-- HTML/CSS/JS — avatar embed WebView page (`avatar-embed/`)
+- GLSL - Potential shader code for 3D rendering (via Filament)
 
 ## Runtime
 
 **Environment:**
-- Node.js — build tooling and scripts only; app runs on device
-
-**JS Engine:**
-- Hermes — enabled (`hermesEnabled=true` in `android/gradle.properties`); JSC available as fallback via `io.github.react-native-community:jsc-android:2026004.+`
+- Expo 56.0.8 - React Native development platform
+- React Native 0.85.3 - Cross-platform mobile framework
+- Node.js - Development environment
 
 **Package Manager:**
-- npm (lockfile: `package-lock.json` present)
+- npm - Package management
+- Lockfile: Present (`package-lock.json` 552.3KB)
 
 ## Frameworks
 
 **Core:**
-- Expo SDK ~56.0.8 — managed workflow with bare Android folder
-- React 19.2.3
-- React Native 0.85.3
+- React 19.2.3 - UI component library
+- React DOM 19.2.3 - Web support
+- Expo Router 56.2.7 - File-based routing system
+- React Navigation 7.10.3 (drawer), 7.2.5 (native), 7.16.0 (native-stack) - Navigation framework
 
-**Navigation:**
-- Expo Router ~56.2.7 — file-based routing; `main` entry is `expo-router/entry`; app root is `src/app/_layout.tsx`
-- `@react-navigation/native` ^7.2.5 — peer dep for Expo Router
-- `@react-navigation/native-stack` ^7.16.0
-- `@react-navigation/drawer` ^7.10.3
+**State Management:**
+- Redux 5.0.1 - State container
+- @reduxjs/toolkit 2.12.0 - Redux utilities and setup
+- Redux Persist 6.0.0 - State persistence
+- Redux Thunk 3.1.0 - Async middleware
+- Zustand 5.0.14 - Alternative lightweight state management (used in `src/stores/`)
 
-**3D Rendering — Avatar Embed (WebView layer, production path):**
-- `three` ^0.184.0 (devDependency) — bundled into `avatar-embed/app.js` via esbuild at build time
-- `TalkingHead` (`avatar-embed/modules/talkinghead.mjs`) — custom lip-sync + morph-target animation library driving GLB avatars via Three.js
-- GLB avatar models: `avatar-embed/avatars/prithi.glb` (8.6 MB), `avatar-embed/avatars/Camilia.glb` (2.7 MB)
-- Rendering runs inside a `react-native-webview` WebView, NOT in a native GL context
-- Android: served from local filesystem `file:///android_asset/avatar-web/index.html`
-- iOS: served from hosted Vercel URL (`EXPO_PUBLIC_AVATAR_WEB_VIEW_URL`)
+**Data Fetching:**
+- @tanstack/react-query 5.101.0 - Server state management
+- axios 1.16.1 - HTTP client
 
-**3D Rendering — Native (spike / dead code, NOT in production):**
-- `react-native-filament` ^1.11.0 — Filament-based native 3D renderer; installed but blocked from Metro bundle via `config.resolver.blockList` (see `metro.config.js`)
-- `src/components/filament-preview.tsx` and `src/components/native-avatar-speech.tsx` are dead code kept for spike reference only
-
-**Build/Dev:**
-- esbuild ^0.28.0 — bundles `avatar-embed/src/main.js` → `avatar-embed/app.js` via `scripts/build-avatar-embed.mjs`; targets `chrome109`, `safari16`
-- babel-preset-expo — JS/TS transpilation
-- react-native-reanimated/plugin (Babel plugin, `processNestedWorklets: true`)
-- eslint ^9.0.0 + eslint-config-expo ~56.0.4
+**UI Components:**
+- @rneui/base 5.0.0 - React Native Elements base components
+- @rneui/themed 5.0.0 - Themed UI components
 
 ## Key Dependencies
 
-**State Management:**
-- `@reduxjs/toolkit` ^2.12.0 + `redux` ^5.0.1 + `react-redux` ^9.3.0
-- `redux-persist` ^6.0.0 — persists Redux state to MMKV
-- `redux-thunk` ^3.1.0 — async action middleware
-- `react-native-mmkv-storage` ^12.0.1 — MMKV-based storage adapter for redux-persist
+**Critical:**
+- react-native-reanimated 4.3.1 - High-performance animations (used in `src/components/animated-icon.tsx`)
+- react-native-filament 1.11.0 - 3D rendering engine (avatar display)
+- react-native-mmkv-storage 12.0.1 - Encrypted local storage (persistent client state)
+- expo-file-system 56.0.7 - File operations for asset caching
 
-**Networking:**
-- `axios` ^1.16.1 — used in redux slices (`src/redux/slices/xShareSlice.js`)
-- `fetch` (native) — used throughout `src/app/index.tsx` and `src/screens/Home.js`
+**Gesture & Interaction:**
+- react-native-gesture-handler 2.31.1 - Touch gesture handling
+- react-native-reanimated worklets 0.8.3 & 1.6.3 - High-performance gesture worklets
 
-**UI Components:**
-- `@rneui/base` ^5.0.0 + `@rneui/themed` ^5.0.0 — React Native Elements UI kit
-- `@expo/ui` ~56.0.14 — Expo UI primitives
-- `expo-glass-effect` ~56.0.4
-- `expo-symbols` ~56.0.5
-- `react-native-gesture-handler` ~2.31.1
-- `react-native-safe-area-context` ~5.7.0
-- `react-native-screens` 4.25.2
-- `react-native-reanimated` 4.3.1
-- `react-native-modal` ^14.0.0-rc.1 — **WARNING: release candidate, not stable**
-- `react-native-dropdown-picker` ^5.4.6
-- `react-native-element-dropdown` ^2.12.4
-- `react-native-numeric-input` ^1.9.1
-- `react-native-international-phone-number` ^0.11.6
-- `react-native-vector-icons` ^10.3.0
-- `expo-image` ~56.0.9
+**Media & Device APIs:**
+- expo-audio 56.0.11 - Audio playback (speech synthesis)
+- expo-image 56.0.9 - Optimized image rendering
+- react-native-image-picker 8.2.1 - Image selection
+- react-native-geolocation-service 5.3.1 - Location services
+- react-native-permissions 5.5.2 - Permission management
+- react-native-vector-icons 10.3.0 - Icon library (FontAwesome, Ionicons)
 
-**Media / Device:**
-- `expo-audio` ~56.0.11 — audio playback; microphone permission explicitly disabled in `app.json`
-- `expo-file-system` ~56.0.7 — used for TTS speech cache (`src/utils/speechCache.ts`)
-- `react-native-image-picker` ^8.2.1
-- `react-native-geolocation-service` ^5.3.1
-- `react-native-permissions` ^5.5.2
+**Navigation & UI:**
+- react-native-modal 14.0.0-rc.1 - Modal dialogs
+- react-native-dropdown-picker 5.4.6 - Dropdown components
+- react-native-element-dropdown 2.12.4 - Alternative dropdown
+- react-native-numeric-input 1.9.1 - Number input component
+- react-native-international-phone-number 0.11.6 - Phone input with country codes
+- react-native-safe-area-context 5.7.0 - Safe area management
+- react-native-screens 4.25.2 - Native screen components
 
-**WebView (load-bearing):**
-- `react-native-webview` ^13.16.1 — the entire avatar surface is delivered through this; removing it breaks avatar rendering entirely
+**Utilities:**
+- date-fns 4.3.0 - Date manipulation and formatting
+- react-native-web 0.21.0 - React Native for web
+- expo-web-browser 56.0.5 - Web browser integration
+- expo-webview 13.16.1 - WebView for rendering web content
 
-**Worklets:**
-- `react-native-worklets` 0.8.3
-- `react-native-worklets-core` ^1.6.3
+## Build & Development Tools
 
-**Date / Utilities:**
-- `date-fns` ^4.3.0
-- `@react-native-community/datetimepicker` ^9.1.0
+**Development:**
+- TypeScript 6.0.3 - Type checking
+- ESLint 9.0.0 - Code linting
+- eslint-config-expo 56.0.4 - Expo linting rules
 
-**GLTF Asset Pipeline (devDependencies only):**
-- `@gltf-transform/cli` ^4.3.0 + `@gltf-transform/functions` ^4.3.0 — GLB optimization tooling
-- `draco3dgltf` ^1.5.7 — Draco mesh compression
-- `meshoptimizer` ^1.1.1 — mesh optimization
-- `sharp` ^0.34.5 — image processing for assets
+**Asset Processing:**
+- @gltf-transform/cli 4.3.0 - GLTF file transformation
+- @gltf-transform/functions 4.3.0 - GLTF utility functions
+- draco3dgltf 1.5.7 - 3D mesh compression
+- meshoptimizer 1.1.1 - Mesh optimization
+- sharp 0.34.5 - Image processing
+- three 0.184.0 - 3D library (utilities for tools)
+- esbuild 0.28.0 - JavaScript bundler
 
-**Web compat:**
-- `react-dom` 19.2.3
-- `react-native-web` ~0.21.0
+**Transpilation:**
+- babel-preset-expo - Babel preset for Expo
+- react-native-reanimated/plugin - Babel plugin for worklets
 
-## TypeScript Setup
+## Configuration
 
-- Config: `tsconfig.json`, extends `expo/tsconfig.base`
-- `strict: true`, `allowJs: true`, `checkJs: false`
-- Path aliases: `@/*` → `./src/*`, `@/assets/*` → `./assets/*`
-- Typed routes enabled (`experiments.typedRoutes: true` in `app.json`)
-- React Compiler enabled (`experiments.reactCompiler: true` in `app.json`) — **WARNING: experimental feature as of Expo 56**
+**TypeScript:**
+- Config: `tsconfig.json`
+- Extends: expo/tsconfig.base
+- Path aliases:
+  - `@/*` → `./src/*`
+  - `@/assets/*` → `./assets/*`
+- Strict mode enabled
 
-## Metro Bundler Config
+**Build Configuration:**
+- `app.json` - Expo configuration with platform-specific settings
+- `metro.config.js` - Metro bundler (adds `.glb` asset support, excludes Filament spike assets)
+- `babel.config.js` - Babel configuration with reanimated worklets plugin
 
-File: `metro.config.js`
+**Linting:**
+- `eslint.config.js` - ESLint flat config with Expo rules
 
-- Extends `expo/metro-config` defaults
-- Adds `.glb` to `assetExts` to allow bundling GLB files
-- **Blocks `assets/models/` directory** from the bundle — Filament spike GLBs (~32 MB) are explicitly excluded
-- The production avatar GLBs live in `avatar-embed/avatars/` and are copied to `android-local-assets/` by the build script, not bundled via Metro
+**Environment:**
+- `.env` - Local environment variables (not committed)
+- `.env.example` - Template with required variables:
+  - `EXPO_PUBLIC_MBTS_API_URL` - Main API endpoint
+  - `EXPO_PUBLIC_AVATAR_SPEECH_API_URL` - Speech synthesis API
+  - `EXPO_PUBLIC_AVATAR_WEB_VIEW_URL` - Avatar web view URL
 
-## Babel Config
+## Scripts
 
-File: `babel.config.js`
+```bash
+npm start              # Start Expo development server
+npm run android        # Build and run on Android
+npm run ios            # Build and run on iOS
+npm run web            # Run web version
+npm run lint           # Run ESLint
+npm run reset-project  # Reset project state
+npm run build:avatar-embed  # Build avatar web bundle
+npm run dev:avatar     # Serve avatar bundle locally on port 8090
+```
 
-- Preset: `babel-preset-expo`
-- Plugin: `react-native-reanimated/plugin` with `{ processNestedWorklets: true }`
+## Platform Support
 
-## Android-Specific Configuration
+**Mobile:**
+- iOS (Expo)
+- Android (Expo)
 
-**Gradle version:** 9.3.1 (`android/gradle/wrapper/gradle-wrapper.properties`)
+**Web:**
+- Static web build (Vercel deployment for avatar frontend)
 
-**Build config** (`android/app/build.gradle`):
-- `applicationId`: `com.mbts.botcierge`
-- `minSdkVersion`: 24 (Android 7.0, confirmed via Expo module manifests)
-- `targetSdkVersion`: 36
-- `compileSdkVersion`: 36
-- JS engine: Hermes (`hermesEnabled=true`)
-- New Architecture enabled: `newArchEnabled=true` (TurboModules + Fabric renderer)
-- Edge-to-edge display: `edgeToEdgeEnabled=true`
-- Build architectures: `armeabi-v7a`, `arm64-v8a`, `x86`, `x86_64`
-- R8 minification: **disabled** by default (`enableMinifyInReleaseBuilds` not set, defaults false)
-- Resource shrinking: disabled by default
-- Release signing: **uses debug keystore** — not production-ready
-
-**GIF/WebP support:** GIF enabled, WebP enabled, animated WebP disabled
-
-**Local asset bundling (offline avatar for Android):**
-- `android-local-assets/avatar-web/` is injected into Gradle asset merging via `sourceSets.main.assets.srcDirs` in `android/app/build.gradle`
-- Contents: `index.html`, `app.js`, `playback-worklet.js`, `avatars/manifest.json`, `avatars/prithi.glb`, `avatars/Camilia.glb`, `backgrounds/bg1-5.jpg`
-- WebView loads this as: `file:///android_asset/avatar-web/index.html`
-- Rebuild command: `npm run build:avatar-embed`
-- **WARNING**: The avatar GLBs are committed to the repo and in `android-local-assets/`. They must be manually regenerated and committed when avatar models change.
-
-**Blocked Android permissions** (in `app.json`):
-- `android.permission.SYSTEM_ALERT_WINDOW`
-- `android.permission.RECORD_AUDIO`
-
-## iOS-Specific Configuration
-
-- App icon at `./assets/expo.icon` (separate from Android)
-- Expo Router manages iOS navigation stack
-- Avatar WebView loads from hosted Vercel URL (no local bundle for iOS — Android only gets offline embed)
-- No iOS-specific native modules beyond what Expo autolinking handles
-- `allowsInlineMediaPlayback` and `mediaPlaybackRequiresUserAction={false}` set on WebView for inline audio
-
-## EAS / Build Tooling
-
-- **No `eas.json` present** — EAS Build not configured
-- **No `expo-updates`** in dependencies — no OTA updates configured
-- Local build commands: `expo run:android`, `expo run:ios`
-- Avatar embed build: `npm run build:avatar-embed` (must be run before Android builds)
-- No CI/CD pipeline detected
-
-## Feature Flags (Runtime)
-
-Defined in `src/config.js`:
-- `enableVoiceInput: false`
-- `enableOfflineMode: true`
-- `enableChatHistory: true`
-
-## Production Readiness Flags
-
-- Release signing uses debug keystore — **must replace before Play Store submission**
-- R8/ProGuard minification disabled — **enable for production APK size reduction**
-- React Compiler is experimental — monitor for regressions
-- `react-native-modal` is a release candidate — watch for stability issues
-- `react-native-filament` is installed but produces dead native code in the build — consider removing to reduce APK size
-- No EAS Build, no OTA updates, no error tracking, no analytics
+**Experiments Enabled:**
+- Typed Routes (`expo-router`)
+- React Compiler optimization
 
 ---
 
-*Stack analysis: 2026-06-15*
+*Stack analysis: 2026-07-03*

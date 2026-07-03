@@ -1,355 +1,235 @@
 # Coding Conventions
 
-**Analysis Date:** 2026-06-15
-
-## Language Split: Critical Context
-
-This codebase has **two coexisting layers** with completely different conventions:
-
-- **New layer (TypeScript):** `src/app/`, `src/components/*.tsx`, `src/hooks/`, `src/utils/speechCache.ts`, `src/constants/`, `src/types/` — typed, modern
-- **Legacy layer (JavaScript):** `src/screens/`, `src/components/xshare/`, `src/redux/`, `src/services/`, `src/components/avatar/AvatarWebView.js`, `src/components/legacy-mbts-app.js` — untyped, older patterns
-
-All new code must go into the TypeScript layer. The legacy `.js` files are not being converted; they are retained as-is.
-
----
-
-## TypeScript Strictness
-
-**Config:** `tsconfig.json`
-
-```json
-{
-  "extends": "expo/tsconfig.base",
-  "compilerOptions": {
-    "allowJs": true,
-    "checkJs": false,
-    "strict": true,
-    "paths": {
-      "@/*": ["./src/*"],
-      "@/assets/*": ["./assets/*"]
-    }
-  }
-}
-```
-
-- `strict: true` enables all strict checks (`strictNullChecks`, `noImplicitAny`, etc.)
-- `allowJs: true` — legacy `.js` files are allowed in the build
-- `checkJs: false` — JS files are NOT type-checked; only `.ts`/`.tsx` files get strict checking
-- TypeScript version: `~6.0.3`
-
-**Practical result:** TypeScript strictness applies only to the new layer. The legacy layer has zero type enforcement.
-
----
-
-## ESLint Configuration
-
-**Config:** `eslint.config.js`
-
-```js
-const expoConfig = require("eslint-config-expo/flat");
-
-module.exports = defineConfig([
-  expoConfig,
-  {
-    ignores: ["dist/*"],
-  }
-]);
-```
-
-- Uses `eslint-config-expo` flat config (Expo's opinionated ruleset)
-- No custom rules added beyond the Expo preset
-- No Prettier config present; formatting is not enforced by tooling
-- Run via: `npm run lint` → `expo lint`
-
-No `.prettierrc`, no Biome, no `@typescript-eslint` custom rules beyond what `eslint-config-expo` includes.
-
----
+**Analysis Date:** 2026-07-03
 
 ## Naming Patterns
 
-**Files (TypeScript layer):**
-- Components: `kebab-case.tsx` — e.g., `animated-icon.tsx`, `native-avatar-speech.tsx`, `themed-text.tsx`
-- Platform variants: `component-name.web.tsx` — e.g., `animated-icon.web.tsx`, `app-tabs.web.tsx`
-- Hooks: `use-kebab-case.ts` — e.g., `use-color-scheme.ts`, `use-theme.ts`
-- Utilities: `camelCase.ts` — e.g., `speechCache.ts`
-- Constants: `kebab-case.ts` — e.g., `theme.ts`
-- Type declarations: `PascalCase.d.ts` — e.g., `AvatarWebView.d.ts`
+**Files:**
+- React components and hooks: kebab-case with `.tsx` or `.ts` extension
+  - Examples: `animated-icon.tsx`, `use-color-scheme.ts`, `themed-text.tsx`
+  - Store files: PascalCase followed by domain (e.g., `chatStore.ts`, `avatarStore.ts`)
+- Type definition files: snake_case or domain-based naming
+  - Examples: `chat.ts`, `avatar.ts`, `assets.d.ts`
 
-**Files (Legacy JS layer):**
-- Components: `PascalCase.js` — e.g., `UpdateShoppingListModal.js`, `AddPhoneNumberModal.js`
-- Screens: `PascalCase.js` — e.g., `Home.js`, `AvatarSelection.js`
-- Redux slices: `camelCaseSlice.js` — e.g., `personSlice.js`, `xShareSlice.js`
-- Redux store: `store.js`
+**Functions:**
+- camelCase for all function names, both exported and internal
+  - Examples: `addMessage()`, `sendMessage()`, `handleAuthMessage()`, `useAuthFlow()`
+  - Hook names: prefixed with `use` (e.g., `useChatStore()`, `useSpeech()`, `useAuthFlow()`)
+  - Utility functions: camelCase (e.g., `normalizeAvatarMessage()`, `getPersistedBackground()`)
 
-**Functions and variables:**
-- New TS layer: `camelCase` functions, `PascalCase` components, `UPPER_SNAKE_CASE` constants
-- Legacy JS layer: `camelCase` throughout; no consistent constant casing
+**Variables:**
+- camelCase for all local and state variables
+  - Examples: `guestName`, `selectedAvatarId`, `isReplying`, `conversationHistory`
+  - Boolean flags: `is*` prefix (e.g., `isReplying`, `isSelectorOpen`)
+  - Ref objects: `*Ref` suffix (e.g., `scrollViewRef`, `lastDispatchedRef`)
 
-**Types (TS layer):**
-- Inline `type` declarations (not `interface`) — e.g., `type AvatarOption = { ... }`
-- Named with `PascalCase`
-- Props types follow `ComponentNameProps` convention — e.g., `NativeAvatarSpeechProps`, `FilamentPreviewProps`
+**Types:**
+- PascalCase for all type definitions
+  - Interface patterns: `interface ChatStore { ... }`
+  - Type aliases: `type ChatMessage = { ... }`
+  - Examples: `CandidateUser`, `AvatarOption`, `AuthProperty`, `ConversationTurn`
 
----
+**Constants:**
+- UPPER_SNAKE_CASE for all constants and configuration values
+  - Examples: `AUTH_PROPERTIES`, `DEFAULT_AVATAR_ID`, `CHAT_API_URL`, `SPEECH_HEALTH_ENDPOINT`
+  - Configuration arrays: same pattern (e.g., `EMOTION_OPTIONS`, `BACKGROUND_OPTIONS`)
+  - Hardcoded values in constants: same pattern (e.g., `AUTH_FAILURE_PROMPT`)
 
-## Component Patterns
+## Code Style
 
-All components are **functional components**. No class components in either layer.
+**Formatting:**
+- No Prettier configuration detected; using ESLint's built-in formatting rules
+- Indent: 2 spaces (enforced by ESLint config-expo)
+- Line length: No explicit limit observed in code
+- Semicolons: Required (enforced by ESLint)
+- Quotes: Double quotes for strings (enforced by ESLint)
 
-**TypeScript layer patterns:**
+**Linting:**
+- Tool: ESLint 9.0.0 with `eslint-config-expo` (~56.0.4)
+- Config location: `eslint.config.js` (flat config format)
+- Run command: `npm run lint` or `expo lint`
+- Default ignores: `dist/*`
 
-```tsx
-// Named export for most components
-export function FilamentPreview({ avatarId = "prithi", ... }: FilamentPreviewProps) {
-  // ...
-}
+## Import Organization
 
-// Default export required for expo-router route files
-export default function HomeScreen() {
-  // ...
-}
+**Order:**
+1. React core and React Native imports
+2. Third-party library imports (expo-*, react-native-*, @react-navigation/*, etc.)
+3. Local absolute imports using path aliases (`@/...`)
+4. Local relative imports (rarely used)
 
-// memo() wrapping for performance-sensitive components
-export const NativeAvatarSpeech = memo(NativeAvatarSpeechComponent);
+**Pattern:**
+```typescript
+// React and React Native
+import { useState, useCallback } from 'react';
+import { View, StyleSheet, Pressable } from 'react-native';
+
+// Third-party libraries
+import { create } from 'zustand';
+import { useMutation } from '@tanstack/react-query';
+import Animated, { useAnimatedKeyboard } from 'react-native-reanimated';
+
+// Local imports with path aliases
+import { useChatStore } from '@/stores/chatStore';
+import type { ChatMessage, AuthProperty } from '@/types/chat';
+import { mmkvStorage } from '@/utils/mmkv';
 ```
 
-**Legacy JS layer patterns:**
+**Path Aliases:**
+- `@/*` → `./src/*` (primary alias for all source code)
+- `@/assets/*` → `./assets/*` (secondary alias for assets)
+- Used in all imports across the codebase
+- TypeScript configuration: `tsconfig.json` with strict mode enabled
 
-```js
-// Default export only
-export default function LegacyMbtsApp() { ... }
+## Error Handling
 
-// React imported explicitly (old-style)
-import React, { useState, useEffect, useRef } from 'react';
+**Patterns:**
+- Try-catch blocks for async operations
+- Fallback return values with `.catch(() => (defaultValue))`
+- Network errors: JSON parsing failures caught and replaced with empty objects
+  - Example: `(await response.json().catch(() => ({}))) as ResponseType`
+- User-visible errors: wrapped in try-catch-finally with user messages
+- Silent errors: console.log for non-critical failures (e.g., speech synthesis prefetch)
 
-// forwardRef used in JS (AvatarWebView.js)
-const AvatarWebView = forwardRef(({ avatar, ... }, ref) => { ... });
-```
-
----
-
-## Hooks Usage
-
-**Custom hooks (TypeScript layer):**
-
-- `useTheme()` — `src/hooks/use-theme.ts` — returns color tokens for current color scheme
-- `useColorScheme()` — `src/hooks/use-color-scheme.ts` — re-exports from `react-native`
-
-Hook filenames use `use-kebab-case.ts`. All hooks prefixed `use`.
-
-**Standard hooks in `src/app/index.tsx`:**
-`useState`, `useEffect`, `useCallback`, `useRef` from React; `useSafeAreaInsets` from `react-native-safe-area-context`.
-
-**Pattern: `useEffect` with cancellation flags (used consistently):**
-
-```tsx
-let isCancelled = false;
-
-const run = async () => {
-  try {
-    if (isCancelled) return;
-    // ... update state
-  } catch (error) {
-    if (isCancelled) return;
-  }
-};
-
-void run();
-
-return () => { isCancelled = true; };
-```
-
-**`void` prefix on floating promises:**
-All fire-and-forget async calls use `void`: `void run()`, `void playSpeech()`, `void prefetch()`. This is consistent throughout the TypeScript layer.
-
----
-
-## Import Patterns
-
-**Path alias `@/` maps to `src/`** (defined in `tsconfig.json`):
-
-```tsx
-// Preferred in TS layer
-import { SPEECH_SYNTHESIS_ENDPOINT } from "@/config";
-import AvatarWebView from "@/components/avatar/AvatarWebView";
-import { cacheSpeech, getCachedSpeech } from "@/utils/speechCache";
-import { Colors } from '@/constants/theme';
-```
-
-**Import ordering (observed, not enforced by tooling):**
-1. React / React Native core
-2. Third-party libraries
-3. Internal `@/` alias imports
-
-**Legacy JS layer uses relative paths only:**
-
-```js
-import { baseURL } from '../utils/api';
-import store, { persistor } from '../redux/store/store';
-```
-
-**Named vs default exports:**
-- `expo-router` page files: `export default` (required)
-- TS components: named exports preferred (`export function FilamentPreview`)
-- Legacy JS: `export default` throughout
-
----
-
-## State Management Patterns
-
-**Two coexisting approaches:**
-
-**1. Local component state — TypeScript layer (`src/app/index.tsx`):**
-
-All state is component-local `useState`. No Redux in the main chat screen. Covers: messages, speech queue, avatar/voice/emotion selection, auth flow steps, user session.
-
-**2. Redux Toolkit + redux-persist — Legacy layer (`src/redux/`):**
-
-```js
-// src/redux/store/store.js
-const store = configureStore({
-  reducer: persistedReducer,   // redux-persist wrapping MMKV
-  middleware: getDefaultMiddleware => getDefaultMiddleware({
-    serializableCheck: { ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER] },
-  }),
-});
-```
-
-Slices: `src/redux/slices/personSlice.js`, `postSlice.js`, `xShareSlice.js`
-Used in: `src/screens/Home.js` via `useSelector`/`useDispatch`
-
-The new `src/app/index.tsx` does NOT use Redux. The legacy `src/screens/Home.js` requires Redux for person/package data via the `<StoreProvider>` in `src/components/legacy-mbts-app.js`.
-
----
-
-## Error Handling Patterns
-
-**TypeScript layer — `try/catch/finally` with `instanceof Error`:**
-
-```tsx
+**Example Pattern:**
+```typescript
 try {
-  await someAsyncOperation();
-} catch (error) {
-  const message =
-    error instanceof Error
-      ? error.message
-      : "Fallback message";
+  const result = await fetchData();
+  // handle success
+} catch (err) {
+  const message = err instanceof Error ? err.message : 'Default error message';
   addAvatarMessage(message);
 } finally {
   setIsReplying(false);
 }
 ```
 
-**HTTP error handling — explicit `response.ok` check before reading body:**
-
-```tsx
-if (!response.ok) {
-  throw new Error(responseJson?.message || `Service failed with ${response.status}`);
-}
-```
-
-**Silent catch for non-critical paths (cache reads):**
-
-```ts
-try {
-  // cache read
-} catch {
-  return null;
-}
-```
-
-**`LogBox.ignoreAllLogs()` is called globally in `src/app/_layout.tsx`** — all React Native warnings and errors are suppressed at the OS level. This is a production quality concern; crashes and warnings won't surface in the UI.
-
----
-
-## Async Patterns
-
-**`async/await` is used exclusively** in the TypeScript layer. No `.then()`/`.catch()` chains in new code.
-
-**`response.json()` fallback pattern to prevent crashes:**
-
-```tsx
-const responseJson = (await response.json().catch(() => ({}))) as IntentResponse;
-```
-
-Used in multiple places in `src/app/index.tsx`. Prevents crashes on malformed/empty API responses.
-
-**Legacy JS layer** mixes `async/await` with `.then()` chains in `src/screens/Home.js` and `src/redux/slices/`.
-
----
-
-## Environment Variable Handling
-
-**Config file:** `src/config.js` (JavaScript, not TypeScript)
-
-```js
-export const MBTS_API_URL =
-  process.env.EXPO_PUBLIC_MBTS_API_URL ||
-  "https://mbts-3d-staging-a97d3e5c7d7c.herokuapp.com/";
-```
-
-- All env vars use the `EXPO_PUBLIC_` prefix (required by Expo for client-side bundling)
-- All env vars have **hardcoded staging server fallbacks** — the app works without any `.env` file
-- Feature flags are hardcoded objects in `config.js`, not env-driven
-- No runtime env validation (no Zod schema, no assertion guards)
-
-**Risk:** The hardcoded staging Heroku URL is the production fallback. Any build without an override hits staging infrastructure.
-
----
-
-## Styling Patterns
-
-**`StyleSheet.create()` is used exclusively.** No inline style object literals, no styling libraries (no NativeWind, no Styled Components, no Tamagui).
-
-```tsx
-const styles = StyleSheet.create({
-  container: { backgroundColor: "#ffffff", flex: 1 },
-});
-```
-
-**Colors are hardcoded hex values** directly in `StyleSheet.create()` throughout `src/app/index.tsx`. The `Colors` token object in `src/constants/theme.ts` exists but is only consumed by `useTheme()` and the `ThemedText`/`ThemedView` components — not by the main screen or most other components.
-
-**Platform branching:**
-
-```tsx
-<KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} />
-```
-
----
+**Response Validation:**
+- Check `response.ok` before processing
+- Validate response type/status fields from API responses
+- Example: `if (!response.ok || json.type !== 'person' || json.status !== 'OK')`
 
 ## Logging
 
-**All logging uses `console.log()`** — no structured logger, no log levels, no stripping in production (beyond `LogBox.ignoreAllLogs()`).
+**Framework:** Native `console` object (no logging library)
 
-**Prefixed tags in new TypeScript code:**
-- `[HomeScreen][AvatarWebView][speech-error]`
-- `[NativeAvatarSpeech] cache:hit`
-- `[speechCache] hit:`
-- `[AvatarWebView]`
+**Patterns:**
+- `console.log()` for error diagnostics and debug info
+- Formatted with context tags: `[functionName][type]` prefix
+  - Example: `console.log('[useSpeech][error]', err)`
+- Used minimally; mostly in error paths
+- No info/warn/debug levels used
 
-**Legacy JS has unprefixed `console.log` scattered throughout `src/screens/Home.js`** (50+ statements), including debug dumps like `console.log('///////////////////////////////////////////////////')` and `console.log('person ---------->', person)`.
+## Comments
+
+**When to Comment:**
+- Complex business logic: logic explaining WHY, not WHAT (see `useAuthFlow.ts`)
+- Algorithm explanations: how matching/filtering works
+- Prefetch logic: explaining optimization strategies
+- Generally minimal; code is self-documenting through naming
+
+**JSDoc/TSDoc:**
+- Not systematically used in source code
+- Type-driven documentation: TypeScript types replace most comments
+- Interface/type exports are self-documenting
+
+**Example of Good Comments:**
+```typescript
+// Prefetch next speech item while current plays.
+useEffect(() => {
+  if (!nextSpeech?.text) return;
+  // ... prefetch logic
+}, [nextSpeech?.id, nextSpeech?.text, selectedAvatar.id, /* ... */]);
+```
+
+## Function Design
+
+**Size:**
+- Most functions 10-50 lines (seen in hooks like `useSpeech`, `useAuthFlow`)
+- Larger functions reserved for components with complex UI logic (e.g., `HomeScreen` is 1017 lines but heavily UI)
+- Favor extracting utilities and logic into separate functions
+
+**Parameters:**
+- Destructured parameters for multiple related values
+  - Example: `({ avatarWebViewRef, selectedAvatar, selectedEmotionId, selectedVoice }: UseSpeechParams)`
+- Use TypeScript interfaces for parameter groups (e.g., `UseSpeechParams`)
+- Single parameter if only one value needed
+
+**Return Values:**
+- Explicit return types via TypeScript
+- Functions return objects for multiple values (e.g., hooks return `{ isPlaying: ... }`)
+- Promise types explicitly declared in async functions
+
+**Example Function:**
+```typescript
+function getLimit(property: AuthProperty): number {
+  return property === 'mothersMaidenName' ? 50 : 30;
+}
+
+const addAvatarMessage = useCallback((message: string) => {
+  const id = `${Date.now()}-avatar`;
+  const normalized = normalizeAvatarMessage(message);
+  addMessage({ id, message: normalized, me: false });
+  addSpeechItem({ id, text: normalized });
+}, [addMessage, addSpeechItem]);
+```
+
+## Module Design
+
+**Exports:**
+- Named exports for utilities and hooks
+- Default exports for components (React convention)
+- Type exports using `export type` syntax
+- Constants exported as named exports
+
+**Barrel Files:**
+- Not used; imports always direct to source file
+- Example: `import { useChatStore } from '@/stores/chatStore'` (not from `@/stores`)
+
+**Store Pattern (Zustand):**
+- Create store with interface defining all state and setters
+- All mutations are action functions on the store
+- No thunks or middleware; direct state updates via `set()`
+- Example from `chatStore.ts`:
+  ```typescript
+  interface ChatStore {
+    messages: ChatMessage[];
+    addMessage: (msg: ChatMessage) => void;
+  }
+  
+  export const useChatStore = create<ChatStore>((set) => ({
+    messages: [],
+    addMessage: (msg) => set((s) => ({ messages: [...s.messages, msg] })),
+  }));
+  ```
+
+## Async & Promises
+
+**Patterns:**
+- `async/await` for all async operations (preferred over `.then()`)
+- `useEffect` cleanup: cancel flag or ref to prevent stale updates
+  - Example: `let cancelled = false; return () => { cancelled = true; };`
+- React Query mutations (`useMutation`) for API calls with built-in loading/error states
+- Void return for fire-and-forget: `void run()` or `void prefetch()`
+
+## State Management
+
+**Zustand Stores:**
+- Located in `src/stores/` directory (e.g., `chatStore.ts`, `avatarStore.ts`)
+- Immutable updates via spread operator: `{ messages: [...s.messages, msg] }`
+- Persistent state via MMKV integration: `mmkvStorage.setString('key', value)`
+- Used for UI state and conversation data
+
+**React Query (TanStack Query):**
+- `useMutation` for POST/write operations
+- Located in hooks (e.g., `useSendMessage.ts`, `useGetPerson.ts`)
+- Error handling via try-catch within `mutationFn`
+- Response parsing with fallback: `.catch(() => ({}))`
+
+**Local State:**
+- `useState` for component-local UI state (modals, selections, input fields)
+- `useRef` for non-rendering state (refs to WebView, cancel flags)
 
 ---
 
-## Code Organization Consistency
-
-**Consistency rating: Low.** Two complete paradigms coexist without consolidation:
-
-| Dimension | New Layer | Legacy Layer |
-|---|---|---|
-| Language | TypeScript (`.tsx`/`.ts`) | JavaScript (`.js`) |
-| File naming | `kebab-case` | `PascalCase` |
-| State | Local `useState` | Redux + persist |
-| Navigation | `expo-router` file-based | Stub `navigation` prop |
-| Imports | `@/` alias | Relative paths |
-| Async | `async/await` only | Mixed |
-
-**Additional inconsistencies:**
-- `src/config.js` is JavaScript while all surrounding TypeScript files import it
-- `src/components/avatar/AvatarWebView.js` has a hand-maintained `AvatarWebView.d.ts` type stub — types must be kept in sync manually with the JS implementation
-- `src/utils/speechCache.ts` and `src/components/native-avatar-speech.tsx` both implement TTS caching with separate hash functions and cache key schemes — duplicated logic, risk of divergence
-- `Spacing` tokens in `src/constants/theme.ts` use non-numeric names (`half=2`, `one=4`, `two=8`, `three=16`) — confusing and inconsistently adopted
-
----
-
-*Convention analysis: 2026-06-15*
+*Convention analysis: 2026-07-03*

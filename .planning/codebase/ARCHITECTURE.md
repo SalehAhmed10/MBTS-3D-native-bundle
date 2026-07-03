@@ -1,343 +1,236 @@
 # Architecture
 
-**Analysis Date:** 2026-06-15
-**Focus:** Android/iOS production scalability
+**Analysis Date:** 2026-07-03
 
 ## Pattern Overview
 
-**Overall:** Flat single-screen app with a WebView-embedded 3D avatar runtime
+**Overall:** Layered Mobile-Web Hybrid with Dual State Management
 
 **Key Characteristics:**
-- Single active screen (`src/app/index.tsx`) owns almost all product logic
-- 3D rendering happens inside a WebView (`react-native-webview`) running a bundled Three.js page, not native GL
-- Communication between React Native and the avatar page uses a bidirectional postMessage bridge
-- Redux is present but the main screen uses only local React state; Redux serves the legacy secondary codebase
-- Backend calls are raw `fetch()` calls with no abstraction layer (no API client, no error retry, no token refresh)
-
----
+- React Native + Expo with file-based routing (expo-router)
+- Dual state management: Zustand for reactive UI state + Redux for persistent legacy data
+- Component-based UI with custom hooks for business logic
+- Embedded WebView rendering 3D avatar (Three.js)
+- Multiple external API layers: Chat, Text-to-Speech, Backend services
+- Lazy-loaded offline bundle caching for avatar assets
 
 ## Layers
 
-**Expo Router shell:**
-- Purpose: App entry point, theme provider, Heroku dyno warm-up ping
-- Location: `src/app/_layout.tsx`
-- Contains: `ThemeProvider`, `AnimatedSplashOverlay`, `Slot` (child route outlet)
-- Depends on: `expo-router`, `src/config.js`
-- Used by: Metro bundler entry (`expo-router/entry`)
+**Presentation (UI Components):**
+- Purpose: Render user interface, capture interactions, display avatar and messages
+- Location: `src/app/`, `src/components/`
+- Contains: React Native components (View, TextInput, Modal, ScrollView), styled sheets, event handlers
+- Depends on: React Native, Expo, react-native-reanimated, Zustand stores
+- Used by: App entry point, receives updates from stores and hooks
 
-**Main screen (monolithic):**
-- Purpose: All primary product logic — chat state machine, speech queue, avatar control, auth flow
-- Location: `src/app/index.tsx` (~1,335 lines)
-- Contains: chat step state machine (`name → intent → auth`), speech queue, TTS fetch, speech cache reads/writes, avatar event handler, background/emotion selectors, user verification flow
-- Depends on: `AvatarWebView`, `speechCache`, `config.js`, `api.js`, raw `fetch()`
-- Used by: Expo Router
+**State Management:**
+- Purpose: Manage reactive UI state (avatar selection, chat messages, speech queue) and persistent user data
+- Location: `src/stores/` (Zustand), `src/redux/` (Redux legacy)
+- Contains: Zustand stores (avatarStore.ts, chatStore.ts), Redux slices (personSlice, postSlice, xShareSlice), reducers
+- Depends on: Redux Toolkit, redux-persist, zustand, MMKV storage
+- Used by: Components via hooks, business logic hooks
 
-**Avatar WebView component:**
-- Purpose: Wraps `react-native-webview`, owns the avatar page load lifecycle, queues messages until ready, exposes imperative `ref` API
+**Business Logic (Hooks):**
+- Purpose: Encapsulate feature-specific logic: authentication, messaging, speech synthesis
+- Location: `src/hooks/`
+- Contains: Custom React hooks (useAuthFlow, useSendMessage, useSpeech, useGetPerson)
+- Depends on: Zustand stores, React Query, native APIs
+- Used by: Presentation layer (screens, components)
+
+**Services (Infrastructure):**
+- Purpose: Handle system-level concerns: asset caching, data transformation, intent parsing
+- Location: `src/services/`
+- Contains: Avatar bundle manager (offline caching), text-to-speech utilities, intent resolution, helper data
+- Depends on: expo-file-system, Native WebView bridge
+- Used by: Hooks and components for system operations
+
+**Data Types & Constants:**
+- Purpose: Define type contracts and application configuration
+- Location: `src/types/`, `src/constants/`, `src/config.js`
+- Contains: TypeScript types (chat, avatar), theme constants, API endpoints, feature flags
+- Depends on: None (foundation layer)
+- Used by: All other layers for type safety and configuration
+
+**Web Runtime (Avatar Rendering):**
+- Purpose: Render 3D avatar model, animate emotions, handle voice playback with lip-sync
+- Location: `src/components/avatar/AvatarWebView.js`, `src/components/avatar/avatarBridge.js`, embedded web bundle
+- Contains: WebView wrapper, message bridge (JS↔Native), bootstrap script for avatar selection
+- Depends on: react-native-webview, WebView script injection
+- Used by: Home screen to display avatar
+
+## Data Flow
+
+**Chat Message Cycle:**
+
+1. User types message → TextInput updates → `setInput()` updates chatStore
+2. User presses send → `sendMessage()` called
+3. Add user message to chatStore → Display in chat UI
+4. Call `useSendMessage` hook → Mutation function fetches CHAT_API_URL
+5. Payload includes: current conversationHistory, user name, authentication status, selected avatar
+6. API responds with: reply text, emotion, metadata
+7. Add avatar reply to chatStore + speech queue
+8. `useSpeech` hook detects new speech queue item
+9. Fetch audio from SPEECH_SYNTHESIS_ENDPOINT with avatar/emotion/voice
+10. Cache audio locally (MMKV)
+11. Call WebView's `speakAudio()` method with audio payload
+12. WebView animates avatar and plays audio
+13. On speech complete, WebView dispatches "speech_finished" event
+14. Hook advances speech queue → next item processes
+
+**Avatar Selection Cycle:**
+
+1. User opens avatar selector modal → `setIsSelectorOpen(true)`
+2. User selects avatar from dropdown
+3. `setSelectedAvatarId()` updates avatarStore
+4. Component re-renders, passes new avatar name to AvatarWebView
+5. WebView bootstrap script updates HTML select element
+6. Three.js model reloads the new avatar's GLB file
+7. Avatar background → Similar flow via `setSelectedBackgroundId()`
+8. Emotion/mood → `setSelectedEmotionId()` calls WebView's `setMood()` method
+
+**Authentication Flow:**
+
+1. Chat step = "name" → User enters name
+2. `handleNameMessage()` validates, sets guest name, advances to "intent" step
+3. User sends request requiring authentication (e.g., "login")
+4. API returns `type: "authentication"` with list of candidate users
+5. Store candidate users, set chat step to "auth"
+6. Ask first confirm question: "Are you [name] [lastName] from [city]?"
+7. User responds "yes"/"no"
+8. If "yes" → Ask next auth property question (favoriteColor, homeCountry, etc.)
+9. Filter candidate users by matching responses
+10. When 1 candidate remains → Call `useGetPerson` hook → Verify person
+11. Set authenticated = true, advance to "intent" step
+12. Continue conversation as authenticated user
+
+**Asset Preloading (Background):**
+
+1. App mounts → `_layout.tsx` warmup call to health endpoint
+2. Parallel: AvatarWebView mounts → Check `isBundleCached()`
+3. If not cached → Download CORE_FILES (HTML, JS, manifests, backgrounds) (~5 MB)
+4. Save bundle version marker
+5. Avatar renders with core bundle
+6. Fire-and-forget: `preloadAllGlbs()` downloads avatar GLBs in background
+7. On avatar selection → Check `isAvatarGlbCached()` for that avatar
+8. If not cached → Download on-demand with progress callback
+9. WebView loads GLB from local file URI (offline mode supported)
+
+## Key Abstractions
+
+**AvatarWebView:**
+- Purpose: Bridge React Native and embedded Three.js avatar renderer
 - Location: `src/components/avatar/AvatarWebView.js`
-- Depends on: `avatarBridge.js`, `speechProvider.js`, `react-native-webview`
-- Exposes: `ref.speak()`, `ref.speakAudio()`, `ref.showText()`, `ref.setAvatar()`, `ref.setMood()`, `ref.setBackground()`
+- Pattern: Ref-based imperative API + passive message event binding
+- Methods: `setAvatar()`, `setBackground()`, `setMood()`, `speakAudio()`
+- Events: "avatar_ready", "speech_finished", "avatar_error"
+- Message bridge: `avatarBridge.js` encodes/decodes command and event payloads
 
-**Avatar bridge utilities:**
-- Purpose: URL construction, message serialization, avatar name normalization, injection script builder
-- Location: `src/components/avatar/avatarBridge.js`
-- Key exports: `bundledAvatarWebViewUrl()`, `buildAvatarWebViewUrl()`, `buildAvatarInjection()`, `buildAvatarBridgeMessage()`
+**ChatStore (Zustand):**
+- Purpose: Centralized chat and auth state, persistent conversation history
+- Location: `src/stores/chatStore.ts`
+- State: messages[], speechQueue[], conversationHistory[], chatStep, guestName, authenticated, person, users, authProperties, currentAuthProp
+- Selectors: Subscription hooks for nested properties
+- Actions: addMessage, addSpeechItem, advanceSpeechQueue, setChatStep, setAuthenticated, etc.
 
-**Speech provider:**
-- Purpose: Resolves which speech mode to use and the speech synthesis endpoint URL
-- Location: `src/components/avatar/speechProvider.js`
-- Current mode: always `service` (hits Heroku backend), never `local-webview`
+**AvatarStore (Zustand):**
+- Purpose: Avatar customization state (selection, voice, emotion, background)
+- Location: `src/stores/avatarStore.ts`
+- State: avatarOptions[], selectedAvatarId, selectedVoiceId, selectedEmotionId, selectedBackgroundId, activeBgCategory, isSelectorOpen
+- Persistence: selectedBackgroundId persisted to MMKV storage
+- Computed: Selected avatar, voice, background lookups
 
-**Speech cache:**
-- Purpose: Filesystem-level TTS response cache keyed by (text, avatarId, voiceId); avoids redundant backend calls
-- Location: `src/utils/speechCache.ts`
-- Storage: `expo-file-system` `Paths.cache` directory, JSON files with djb2 hash keys
-- Cache prefix: `tts-v1`
+**useSpeech Hook:**
+- Purpose: Orchestrate text-to-speech synthesis, caching, and WebView playback
+- Location: `src/hooks/useSpeech.ts`
+- Pattern: Two useEffect hooks (active speech, prefetch next)
+- Cache layer: localStorage/MMKV via `speechCache.ts`
+- Handles: Speech deduplication, cancellation cleanup, error recovery
 
-**Avatar embed (WebView page source):**
-- Purpose: Self-contained Three.js + TalkingHead page that renders the 3D avatar and handles audio + lipsync
-- Location: `avatar-embed/` (source), `avatar-embed/src/main.js` (entry), `avatar-embed/app.js` (bundled output, 1.8 MB)
-- Runtime: browser (WebView), bundled with esbuild targeting `chrome109 / safari16`
-- Key module: `avatar-embed/modules/talkinghead.mjs` (Three.js lipsync runtime)
-- GLB models: `avatar-embed/avatars/prithi.glb` (~8.6 MB), `avatar-embed/avatars/Camilia.glb` (~2.7 MB)
+**useAuthFlow Hook:**
+- Purpose: Multi-step authentication challenge-response logic
+- Location: `src/hooks/useAuthFlow.ts`
+- State: Questions asked (authProperties), current question (currentAuthProp), candidate users
+- Logic: Filter users by response, advance to next property, verify person when done
 
-**Configuration:**
-- Purpose: Single source of truth for all API URLs and feature flags
-- Location: `src/config.js`
-- Reads: `EXPO_PUBLIC_MBTS_API_URL`, `EXPO_PUBLIC_AVATAR_SPEECH_API_URL`, `EXPO_PUBLIC_AVATAR_WEB_VIEW_URL`
+**useSendMessage Hook:**
+- Purpose: Wrap chat API in React Query mutation with conversation history sync
+- Location: `src/hooks/useSendMessage.ts`
+- Payload: Reads from stores (conversationHistory, guestName, person, srxState) at mutation time
+- Updates: Persists updated history to store after response
+- Error handling: Throws on HTTP error; caller handles display
 
-**Redux store (secondary / legacy):**
-- Purpose: Persisted state for the legacy MBTS screens (person, posts, xShare)
-- Location: `src/redux/store/store.js`, `src/redux/reducers/rootReducer.js`
-- Persistence: MMKV via `react-native-mmkv-storage`
-- Slices: `personSlice`, `postSlice`, `xShareSlice`
-- Note: NOT used by the main `index.tsx` screen — only wired in `legacy-mbts-app.js`
+## Entry Points
 
----
+**App Root:**
+- Location: `src/app/_layout.tsx`
+- Triggers: App start, exposed via Expo Router as `/
+- Responsibilities: 
+  - Wrap app in QueryClientProvider (React Query)
+  - Wrap in ThemeProvider (dark/light mode)
+  - Render AnimatedSplashOverlay (loading state)
+  - Fire health check request to warm TTS backend
+  - Render Slot (Expo Router outlet for child routes)
 
-## 3D / Three.js Rendering Approach
+**Home Screen:**
+- Location: `src/app/index.tsx`
+- Triggers: Default route (/) when app opens
+- Responsibilities:
+  - Render avatar panel with WebView
+  - Manage chat scroll and keyboard interaction
+  - Render message list and input bar
+  - Render avatar selector modal
+  - Orchestrate avatar lifecycle (hydrate options, set mood/avatar/background)
+  - Dispatch messages to chat/auth/intent flows
+  - Handle speech playback coordination
 
-**Approach: WebView-hosted Three.js (not native OpenGL)**
+## Error Handling
 
-The 3D avatar does NOT render directly in React Native's native GL context. Instead:
+**Strategy:** Multi-layer error recovery with graceful degradation
 
-1. A `react-native-webview` WebView loads a self-contained HTML page (`avatar-embed/index.html`)
-2. That page runs `three` (r184) + `TalkingHead` library inside the WebView's Chromium engine (Android) or WKWebView (iOS)
-3. The WebView canvas renders the GLB model with morph-target-based lipsync and plays audio via AudioContext
-4. React Native communicates via `injectJavaScript()` (RN → WebView) and `window.ReactNativeWebView.postMessage()` (WebView → RN)
+**Patterns:**
 
-**Why this matters for production:**
-- No JSI bridge for 3D — the WebView JS engine is isolated from the RN JS thread; no shared memory
-- Avatar load time is dominated by WebView boot + GLB fetch, not JS bundle parse
-- `react-native-filament` is installed and `filament-preview.tsx` + `native-avatar-speech.tsx` exist as dead-code spike artifacts; they are blocked from Metro bundling via `config.resolver.blockList` in `metro.config.js`
+1. **Network errors:** Catch at hook level, return user-friendly message to avatar
+   - `useSendMessage`: On fetch fail, throw error caught in HomeScreen `sendMessage`
+   - Avatar displays: "I could not reach BOTCierge right now. Please try again."
 
----
+2. **TTS synthesis errors:** `useSpeech` catches, logs, advances queue
+   - If synthesis fails, speech queue advances; conversation continues
+   - User doesn't see error, just no audio (graceful degrade)
 
-## Avatar / Video Rendering Pipeline
+3. **Asset loading errors:** Service layer (_avatarBundleManager_) silently retries
+   - Missing core bundle → Download on demand during app use
+   - Missing avatar GLB → Download when selected, reuse cached if available
+   - Corrupt file detection: size < 50KB triggers re-download
 
-```
-User types message
-       |
-       v
-HomeScreen.sendMessage()
-  -> fetch(baseURL + 'intents/intentHandler')   [or requestHandler if authenticated]
-  -> MBTS API returns { message, type, data }
-       |
-       v
-addAvatarMessage(text)
-  -> appends to messages[] (display)
-  -> appends to speechQueue[] (TTS dispatch)
-       |
-       v
-useEffect watches speechQueue[0] (activeSpeech)
-  -> getCachedSpeech(text, avatarId, voiceId)   [expo-file-system cache lookup]
-       |
-       +-- cache hit: use cached payload
-       |
-       +-- cache miss:
-             fetch(SPEECH_SYNTHESIS_ENDPOINT)   [Heroku TTS backend]
-             cacheSpeech(...)                   [writes JSON to Paths.cache]
-       |
-       v
-avatarWebViewRef.current.speakAudio({
-  audioBase64, words, wordTimes, wordDurations,
-  visemes, visemeTimes, visemeDurations
-})
-  -> AvatarWebView.injectJavaScript(buildAvatarInjection(payload))
-       |
-       v
-window.handleReactNativeMessage(payload)   [inside WebView]
-  -> TalkingHead.speakAudio()              [Three.js morph-target animation + AudioContext]
-       |
-       v
-window.ReactNativeWebView.postMessage({ type: 'speech_finished' })
-  -> AvatarWebView.onMessage handler
-  -> handleAvatarEvent -> advanceSpeechQueue()
-  -> processes speechQueue[1] (now [0])
-```
+4. **Authentication errors:** `useAuthFlow` catches exception, shows AUTH_FAILURE_PROMPT
+   - User can re-attempt or register
 
-**Prefetch optimization:** While `speechQueue[0]` is playing, `speechQueue[1]` text is prefetched from the TTS backend and cached, so the next message starts with zero TTS latency (lines 741–782 of `src/app/index.tsx`).
-
----
-
-## Android Offline Asset Bundling
-
-Android WebView cannot use `fetch()` against `file://` URIs by default. The project resolves this with a four-stage asset pipeline:
-
-**Stage 1 — Build avatar embed:**
-```
-npm run build:avatar-embed
-  runs: scripts/build-avatar-embed.mjs
-  esbuild bundles:
-    avatar-embed/src/main.js  ->  avatar-embed/app.js  (1.8 MB, ESM, chrome109/safari16)
-  copies:
-    avatar-embed/app.js           -> android-local-assets/avatar-web/app.js
-    avatar-embed/index.html       -> android-local-assets/avatar-web/index.html
-    avatar-embed/playback-worklet.js -> android-local-assets/avatar-web/playback-worklet.js
-    avatar-embed/avatars/*.glb    -> android-local-assets/avatar-web/avatars/
-    avatar-embed/backgrounds/*.jpg -> android-local-assets/avatar-web/backgrounds/
-```
-
-**Stage 2 — Gradle asset injection:**
-```
-android/app/build.gradle:
-  sourceSets { main { assets.srcDirs += ["${projectRoot}/android-local-assets"] } }
-
-Gradle merges android-local-assets/ into the APK assets/ directory at build time.
-Result: file:///android_asset/avatar-web/index.html exists in the APK.
-```
-
-**Stage 3 — Runtime URL selection:**
-```
-avatarBridge.bundledAvatarWebViewUrl('android')
-  returns: 'file:///android_asset/avatar-web/index.html'
-
-iOS / Web:
-  returns: defaultAvatarWebViewUrl()
-  which is: AVATAR_WEB_VIEW_URL  (https://mbts-3-d-native-bundle.vercel.app/)
-```
-
-**Stage 4 — file:// fetch polyfill:**
-`avatar-embed/index.html` includes an inline script that replaces `window.fetch` with an XHR-backed implementation for `file://` URLs. This is required because Android WebView blocks `fetch()` on `file://` origins even when `allowFileAccessFromFileURLs` is enabled on the WebView.
-
-**iOS gap:** iOS does not yet have a bundled path. Every iOS session requires a network round-trip to Vercel to load the avatar page. GLB models are also fetched from Vercel CDN on every cold start.
-
----
-
-## Navigation Architecture
-
-**Router:** Expo Router (file-based, `expo-router ~56.2.7`)
-
-**Active route structure:**
-```
-src/app/
-  _layout.tsx   — root layout: ThemeProvider, AnimatedSplashOverlay, Slot
-  index.tsx     — only active route (renders the entire product)
-```
-
-**Legacy screens (not reachable via Expo Router):**
-- `src/screens/Home.js` — old MBTS chat screen (accessed via `legacy-mbts-app.js` stub)
-- `src/screens/AvatarSelection.js`, `ActiveNeeds.js`, `Bidders.js`, `MyNeeds.js`, etc.
-- These screens use React Navigation props (`navigation.navigate`, `navigation.goBack`) which are stubbed out in `legacy-mbts-app.js` with no-op implementations
-
-`@react-navigation/drawer`, `@react-navigation/native`, `@react-navigation/native-stack` are all installed but not wired to any active navigation tree.
-
----
-
-## State Management Flow
-
-**Main screen (`src/app/index.tsx`) — local React state only:**
-
-| State | Type | Purpose |
-|---|---|---|
-| `messages` | `ChatMessage[]` | Chat history for display |
-| `speechQueue` | `SpeechQueueItem[]` | Ordered TTS dispatch; item[0] is active |
-| `chatStep` | `"name" \| "intent" \| "auth"` | Conversation state machine |
-| `authenticated` | `boolean` | Whether user passed KBA challenge |
-| `person` | `CandidateUser \| null` | Verified user record |
-| `users` | `CandidateUser[]` | Candidates during auth flow |
-| `selectedAvatarId` | `string` | Active avatar selection |
-| `selectedVoiceId` | `string \| null` | Active voice selection |
-| `selectedEmotionId` | emotion union | Active mood/emotion |
-| `selectedBackgroundId` | background union | Active background |
-| `avatarOptions` | `AvatarOption[]` | Hydrated from avatar_ready event |
-
-**Redux store (legacy screens only, not used by `index.tsx`):**
-- `PostData` — post feed data (postSlice)
-- `person` — user profile (personSlice)
-- `xShare` — xShare feature data (xShareSlice)
-- Persisted to MMKV; rehydrated via `redux-persist` + `PersistGate`
-
----
-
-## Backend Communication Pattern
-
-**Protocol:** Plain REST over HTTPS, raw `fetch()`, no client wrapper, no retry logic
-
-**All endpoints (called from `index.tsx` and `_layout.tsx`):**
-
-| Purpose | Method | Path |
-|---|---|---|
-| Dyno warm-up | GET | `{AVATAR_SPEECH_API_URL}avatarSpeech/health` |
-| Intent routing | POST | `{MBTS_API_URL}intents/intentHandler` |
-| Request handling | POST | `{MBTS_API_URL}requests/requestHandler` |
-| User lookup | POST | `{MBTS_API_URL}users/getPersonById` |
-| TTS synthesis | POST | `{AVATAR_SPEECH_API_URL}avatarSpeech/synthesize` |
-
-**No WebSocket.** All communication is synchronous request-response. Avatar speech is fetched, cached, then injected into WebView as base64.
-
-**Request body shape for intent handler:**
-```json
-{ "srx": { "firstName": "...", "speechInput": "..." } }
-```
-
-**Request body shape for request handler:**
-```json
-{ "srx": { "_id": "...", "email": "...", "intent": "...", "packages": [], "isAiMessage": false } }
-```
-
-**Error handling pattern (at every call site):**
-```javascript
-try {
-  const response = await fetch(...);
-  const json = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(json.message || `failed with ${response.status}`);
-  // use json
-} catch (error) {
-  addAvatarMessage(error.message || "I could not reach BOTCierge right now.");
-} finally {
-  setIsReplying(false);
-}
-```
-No retry, no exponential backoff, no request deduplication, no offline queue.
-
----
-
-## Metro Bundler Configuration
-
-`metro.config.js` makes exactly two changes to the Expo default:
-
-1. **Enable GLB assets:** `config.resolver.assetExts.push("glb")` — lets Metro treat `.glb` files as static assets (used by the spike Filament path only)
-2. **Block Filament models:** `config.resolver.blockList` excludes `assets/models/**` — prevents the 32 MB Filament GLBs from being bundled (the active path does not use Metro-resolved GLBs)
-
-The active production avatar GLBs are NOT resolved by Metro. They travel via:
-- Android: Gradle asset pipeline → APK assets → `file:///android_asset/avatar-web/avatars/`
-- iOS / Web: Vercel CDN → `https://mbts-3-d-native-bundle.vercel.app/avatars/`
-
----
-
-## Worker Threads / Background Processing
-
-**AudioWorklet:** `avatar-embed/playback-worklet.js` (~8.4 KB) runs in an `AudioWorklet` context inside the WebView for low-latency audio scheduling. Entirely isolated to the WebView's audio thread — invisible to React Native.
-
-**No React Native background processing.** `react-native-worklets` and `react-native-worklets-core` are installed but not used in the active codebase. `react-native-reanimated` is installed but not used in the active screens.
-
-**TTS prefetch** runs as a best-effort async `fetch()` on the main RN JS thread. No queue management, no cancellation beyond an `isCancelled` flag.
-
----
+5. **WebView bridge errors:** Bootstrap script wrapped in try-catch, no-ops on fail
+   - Avatar selection falls back to default if mutation fails
 
 ## Cross-Cutting Concerns
 
-**Logging:**
-- `console.log` with manual namespace prefixes: `[AvatarWebView]`, `[AVT]`, `[speechCache]`, `[HomeScreen][AvatarWebView]`
-- No structured logger or log levels
-- `LogBox.ignoreAllLogs()` is called in `_layout.tsx` — all RN warnings are suppressed globally, including in production builds
+**Logging:** 
+- Minimal console output, mostly errors: `console.log('[hook-name][context]', error)`
+- LogBox suppression in _layout.tsx (production setup)
 
 **Validation:**
-- Inline regex and length checks in `sendMessage()` (name field: `/^[A-Za-z0-9' ]+\??$/`, auth responses: length limits per property)
-- No schema validation library
+- Name validation: `/^[A-Za-z0-9' ]+\??$/` (alphanumeric, space, apostrophe, optional ?)
+- Auth response filtering: Text matching against CandidateUser properties (case-insensitive contains)
+- API response validation: Coerce to expected types, provide defaults (e.g., reply defaults to empty string)
 
 **Authentication:**
-- Knowledge-based challenge-response (favorite color, home country, home state, mother's maiden name)
-- No JWT, no session token, no secure storage of credentials
-- Auth state (`authenticated`, `person`) is ephemeral React state — lost on app restart
+- Multi-property challenge-response system (favoriteColor, homeCountry, homeState, mothersMaidenName)
+- Stateful user filtering: Each answer narrows candidate list
+- Session scoped: authenticated flag + person object, no token-based auth in chat API
 
-**Platform branching:**
-- `Platform.OS === 'android'` in `AvatarWebView.js` and `avatarBridge.js` to select bundled vs. hosted avatar URL
-- iOS always hits Vercel network
-
----
-
-## Production Scalability Flags
-
-These architectural properties directly affect Android/iOS production readiness:
-
-1. **Monolithic screen:** `src/app/index.tsx` is 1,335 lines. Adding features means growing this file unless screens are extracted.
-
-2. **No API client layer:** Every new backend call requires copy-pasting the `fetch()` + `try/catch` + error-message pattern. No centralized timeout, auth header, or error handling.
-
-3. **iOS has no offline avatar:** iOS fetches the 1.8 MB avatar page + 11 MB of GLBs from Vercel on every cold start. If Vercel is down, iOS shows no avatar.
-
-4. **TTS audio as base64 in memory:** The full audio payload (audioBase64 + word timings + visemes) is held in JS memory until injected into the WebView. For longer texts this is multiple MB in the JS heap.
-
-5. **Speech cache has no eviction:** `speechCache.ts` writes indefinitely to `Paths.cache`. Cache entries are never pruned. On long-lived installs this directory will grow unboundedly.
-
-6. **No session persistence:** `authenticated` and `person` are not persisted. Users must re-authenticate on every app launch.
-
-7. **Dead code in production bundle:** `legacy-mbts-app.js`, 7 legacy screens, and all their `.js` component files (ActivityLedgerModal, CategoryListModal, etc.) are imported transitively and included in the bundle. Their dependencies (`@rneui`, `react-native-numeric-input`, etc.) inflate the bundle.
-
-8. **Release build still uses debug keystore:** `android/app/build.gradle` release `signingConfig` points to `signingConfigs.debug`. Must be changed before publishing to Play Store.
+**Offline Mode:**
+- Core bundle cached locally (index.html, JS, backgrounds)
+- Avatar GLBs cached lazily
+- Chat messages stored in ChatStore (in-memory for session)
+- Speech audio cached (MMKV storage)
+- Health check call on app start (not blocking)
 
 ---
 
-*Architecture analysis: 2026-06-15*
+*Architecture analysis: 2026-07-03*
