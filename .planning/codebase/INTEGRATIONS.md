@@ -4,184 +4,214 @@
 
 ## APIs & External Services
 
-**Chat & LLM:**
-- chatcamille.ai - Conversational AI backend
+**Chat & Intent Processing:**
+- ChatCamille API - Conversational AI backend
   - Endpoint: `https://www.chatcamille.ai/api/chat`
+  - SDK/Client: Fetch API (native)
   - Method: POST
-  - Client: `src/hooks/useSendMessage.ts` (via `fetch`)
-  - Request: Message, avatar name, user ID, authentication status, conversation history
-  - Response: Chat reply and metadata
-  - Used for: Main conversation engine with avatar
+  - Used by: `src/hooks/useSendMessage.ts`
+  - Payload: message, avatar, userId, userName, sessionName, authenticated status, conversation history, packages, SRX state
+  - Response: reply text, emotion state, type (authentication), data (candidate users), srxState
 
-**User Management & Authentication:**
-- MBTS API (Heroku) - User identity verification and data management
-  - Base URL: Configured via `EXPO_PUBLIC_MBTS_API_URL` (defaults to `https://mbts.herokuapp.com/`)
-  - Configured in: `src/config.js`, `src/utils/api.js`
+**User & Identity Verification:**
+- MBTS Backend API - Main application backend
+  - Base URL: Configurable via `EXPO_PUBLIC_MBTS_API_URL` (defaults to `https://mbts-3d-staging-a97d3e5c7d7c.herokuapp.com/`)
+  - SDK/Client: Fetch API (native)
   - Endpoints:
-    - `POST /users/getPersonById` - Verify user identity by ID
-      - Client: `src/hooks/useGetPerson.ts`
-      - Payload: User ID
-      - Returns: Verified person data including packages and avatar preferences
-  - Auth: None (public API, user ID in payload)
+    - `POST /users/getPersonById` - Verify user identity during auth flow
+  - Used by: `src/hooks/useGetPerson.ts`
+  - Auth: None (client-side)
+  - Request: `{ user: { _id: string } }`
+  - Response: PersonResponse with user data (email, name, home details, avatar preferences, packages)
 
-**Speech Synthesis:**
-- Avatar Speech API (Heroku staging) - Text-to-speech synthesis
-  - Base URL: Configured via `EXPO_PUBLIC_AVATAR_SPEECH_API_URL` (defaults to `https://mbts-3d-staging-a97d3e5c7d7c.herokuapp.com/`)
-  - Configured in: `src/config.js`
+**Text-to-Speech Synthesis:**
+- Avatar Speech API - Voice synthesis and lip-sync generation
+  - Base URL: Configurable via `EXPO_PUBLIC_AVATAR_SPEECH_API_URL` (defaults to `https://mbts-3d-staging-a97d3e5c7d7c.herokuapp.com/`)
+  - SDK/Client: Fetch API (native)
   - Endpoints:
-    - `POST /avatarSpeech/synthesize` - Convert text to speech with viseme data
-      - Client: `src/hooks/useSpeech.ts`
-      - Payload: Text, avatar ID, mood/emotion, voice ID
-      - Response: Base64 audio, viseme timings for lip-sync
-    - `GET /avatarSpeech/health` - Warm up dyno and TTS worker
-      - Client: `src/app/_layout.tsx` (called on app startup)
-  - Features: Viseme synchronization for animated lip-sync
-  - Caching: Speech responses cached in MMKV storage (`src/utils/speechCache.ts`)
+    - `POST /avatarSpeech/synthesize` - Generate speech audio with visemes
+    - `GET /avatarSpeech/health` - Health check (warms Heroku dyno)
+  - Used by: `src/hooks/useSpeech.ts`
+  - Request: text, avatar ID, mood/emotion, voiceId, voiceLabel
+  - Response: WebViewSpeechPayload
+    - audioBase64: Base64-encoded WAV audio
+    - words: Array of spoken words
+    - wordTimes: Start time of each word
+    - wordDurations: Duration of each word
+    - visemes: Array of viseme codes (e.g., "aa", "E", "I")
+    - visemeTimes: Start time of each viseme
+    - visemeDurations: Duration of each viseme
 
-**Avatar Web Rendering:**
-- Vercel-hosted web application - 3D avatar rendering
-  - URL: Configured via `EXPO_PUBLIC_AVATAR_WEB_VIEW_URL` (defaults to `https://mbts3d-avatar.vercel.app/`)
-  - Configured in: `src/config.js`
-  - Implementation: Loaded via React Native WebView
-  - Communication: Message passing for:
-    - `speakAudio` - Send speech data with word timings and viseme data
-    - Avatar animations and emotion changes
-  - Asset: Prebuilt web bundle with Three.js or Babylon.js 3D engine
+**Avatar Rendering & UI:**
+- Avatar Web View Service - 3D avatar rendering and animation
+  - URL: Configurable via `EXPO_PUBLIC_AVATAR_WEB_VIEW_URL` (defaults to `https://mbts3d-avatar.vercel.app/`)
+  - SDK/Client: React Native WebView (`src/components/avatar/AvatarWebView`)
+  - Communication: Window message passing (postMessage API)
+  - Events:
+    - `avatar_ready`: Avatar loaded, returns supportedAvatars descriptor
+    - `speech_finished`: Audio playback completed
+    - `avatar_error`: Avatar rendering error
+  - Commands from app:
+    - `setAvatar(avatarId)` - Switch avatar
+    - `setBackground(backgroundId)` - Set scene background
+    - `setMood(emotionId)` - Set avatar emotional state (neutral, happy, sad, angry, suggestive, love)
+    - `speakAudio(payload)` - Play audio with lip-sync (words, visemes, timing data)
+  - Hosting: Vercel
+
+**Health Checks & Warmup:**
+- Heroku Dyno Warmup
+  - Endpoint: `${AVATAR_SPEECH_API_URL}avatarSpeech/health`
+  - Called on app launch in `src/app/_layout.tsx`
+  - Purpose: Prevent cold-start delays on TTS first request
 
 ## Data Storage
 
-**Local Storage:**
-- react-native-mmkv-storage - Encrypted file-based key-value store
-  - Location: `src/utils/mmkv.js`
-  - Purpose: Caching speech synthesis results, persistent state
-  - Features: Encryption enabled
-  - Persistence: Redux Persist integrates with this storage
+**Databases:**
+- None detected - This is a client-side mobile/web app
+- Backend data model inferred from API responses:
+  - Users collection with: _id, email, firstName, lastName, homeCity, favoriteColor, homeCountry, homeState, mothersMaidenName
+  - User preferences: avatarName, packages array
+  - Conversation state: srxState (sent to chat API)
 
-**In-Memory State:**
-- Redux store - Conversation history, user auth state, chat messages
-  - Configuration: `src/redux/`
-  - Persisted via Redux Persist to MMKV storage
-- Zustand stores - Alternative lightweight state management
-  - `src/stores/chatStore.ts` - Chat messages, conversation state, auth flow
-  - `src/stores/avatarStore.ts` - Avatar selection and rendering state
-
-**File System Cache:**
-- expo-file-system - Caches speech synthesis audio files locally
+**File Storage:**
+- Local File System (Expo File System)
+  - Location: Application cache directory
+  - Contents: Speech synthesis results (TTS cache)
   - Implementation: `src/utils/speechCache.ts`
-  - Purpose: Avoid re-downloading already-synthesized speech
+  - Cache key: Hash of `{text}|{avatarId}|{voiceId}`
+  - Format: JSON files with audioBase64, words, wordTimes, wordDurations, visemes, visemeTimes, visemeDurations
+  - Lifecycle: Persisted across sessions, manually deleted on write errors
 
-**Database:**
-- None - This is a client-only application
-- Backend APIs handle all persistent data
+**Caching:**
+- Local Speech Cache
+  - Storage: Expo File System
+  - Purpose: Avoid re-synthesizing same text/avatar/voice combination
+  - Implementation: `src/utils/speechCache.ts` with getCachedSpeech() and cacheSpeech()
+  - Hit detection: Logs `[speechCache] hit:` to console
+  - Prefetch strategy: useSpeech hook prefetches next queue item while current plays
+
+**Persistent Preferences:**
+- MMKV Storage (Encrypted)
+  - Used by: `src/stores/avatarStore.ts`
+  - Data stored: selectedBackgroundId (with CDN validation)
+  - Encryption: Enabled by default
+  - Configuration: `src/utils/mmkv.js`
 
 ## Authentication & Identity
 
 **Auth Provider:**
-- Custom (MBTS API-based)
-  - Implementation: Multi-step verification flow in `src/hooks/useAuthFlow.ts`
-  - Challenge questions: Favorite color, home country, home state, mother's maiden name
-  - User identification: Search MBTS API by name, verify against challenge answers
-  - No OAuth/third-party auth
+- Custom (Multi-factor identity verification)
+- Implementation: `src/hooks/useAuthFlow.ts`
 
-**Session Management:**
-- In-memory state (Redux + Zustand)
-- Authenticated user stored in chat state (`src/stores/chatStore.ts`)
-- No token-based authentication visible
+**Auth Flow:**
+1. **Name Entry** - Guest provides first name (validation: alphanumeric + spaces + apostrophe)
+2. **Intent Query** - Chat API receives intent, returns candidate users matching name
+3. **Identity Challenge** - Sequential questions on stored profile data:
+   - Favorite color (max 30 chars)
+   - Home country (max 30 chars)
+   - Home state (max 30 chars)
+   - Mother's maiden name (max 50 chars)
+4. **User Narrowing** - Each answer filters candidate users (substring match, case-insensitive)
+5. **Verification** - GET `/users/getPersonById` to load full profile
+
+**Session State:**
+- guestName: Captured at start
+- authenticated: Boolean flag set on successful verification
+- person: Full user object with email, preferences, packages
+- srxState: Opaque state from chat API (for multi-turn auth or SRX engine)
 
 ## Monitoring & Observability
 
 **Error Tracking:**
-- None detected (errors logged to console via try-catch blocks)
+- None detected - Errors logged to console only
+- Error handling in:
+  - `src/hooks/useSendMessage.ts`: Catch and throw HTTP errors
+  - `src/hooks/useGetPerson.ts`: Throw verification errors
+  - `src/hooks/useSpeech.ts`: Console.log('[useSpeech][error]', err)
 
 **Logs:**
-- Console logging only
-- Debug statements: `console.log('[useSpeech][error]', err)` pattern in `src/hooks/useSpeech.ts`
-- No external logging service (Sentry, LogRocket, etc.)
+- Console logging: `console.log()` and `console.error()` calls
+- Endpoints monitored: Health check to warm TTS dyno on app start
 
-**Analytics:**
-- None detected
+**Performance:**
+- Speech cache hit logging: `[speechCache] hit:` prefix
+- Write errors logged: `[speechCache] write-error`
 
 ## CI/CD & Deployment
 
 **Hosting:**
-- Expo (via `expo-router` and Expo build system)
-- Avatar Web: Vercel (separate deployment)
-- MBTS API: Heroku
-- Speech API: Heroku (staging)
+- Expo Application Services (EAS) - Managed builds and hosting
+- Vercel - Avatar WebView URL hosting
+- Heroku - Backend APIs (staging: mbts-3d-staging-a97d3e5c7d7c.herokuapp.com)
 
-**Build Pipeline:**
-- Local development: `npm start` → Expo Metro bundler
-- iOS: `npm run ios` → Expo build
-- Android: `npm run android` → Expo build
-- Web: `npm run web` → Static build output to `dist/`
+**Build Scripts:**
+- `npm start` - Expo dev server
+- `npm run ios` - iOS simulator build
+- `npm run android` - Android emulator build
+- `npm run web` - Web build
+- `npm run build:avatar-embed` - Custom avatar bundle build
 
-**CI/CD Service:**
-- Not detected (no GitHub Actions, CircleCI, etc.)
-- Local/manual builds via Expo CLI
-
-## Webhooks & Callbacks
-
-**Incoming:**
-- None detected
-
-**Outgoing:**
-- Avatar speech synthesis (request/response pattern, not webhooks)
-- Chat API (request/response pattern, not webhooks)
+**Configuration Management:**
+- MCP (Model Context Protocol) servers configured in `.codex/config.toml`:
+  - Expo MCP server at https://mcp.expo.dev/mcp
+  - Maestro MCP for testing automation
 
 ## Environment Configuration
 
 **Required Environment Variables:**
-```
-EXPO_PUBLIC_MBTS_API_URL              # Main MBTS API endpoint
-EXPO_PUBLIC_AVATAR_SPEECH_API_URL     # Speech synthesis API
-EXPO_PUBLIC_AVATAR_WEB_VIEW_URL       # Avatar web view URL
-```
-
-**Defaults (if env vars not set):**
-- MBTS API: `https://mbts-3d-staging-a97d3e5c7d7c.herokuapp.com/`
-- Avatar Speech: `https://mbts-3d-staging-a97d3e5c7d7c.herokuapp.com/`
-- Avatar Web: `https://mbts-3d-native-bundle.vercel.app/`
+- `EXPO_PUBLIC_MBTS_API_URL` - Main backend (required, has fallback)
+- `EXPO_PUBLIC_AVATAR_SPEECH_API_URL` - TTS service (required, has fallback)
+- `EXPO_PUBLIC_AVATAR_WEB_VIEW_URL` - Avatar renderer (required, has fallback)
 
 **Secrets Location:**
-- `.env` file (local only, not committed)
-- `.env.local` file (local overrides)
-- Template: `.env.example`
+- `.env` file (local, not committed)
+- `.env.local` file (local, not committed)
+- See `.env.example` for template
 
-## Network Configuration
+**Configuration Precedence:**
+1. Environment variables (process.env.EXPO_PUBLIC_*)
+2. Fallback URLs in `src/config.js`
 
-**API Communication:**
-- Method: Standard HTTPS/REST with `fetch` API
-- Headers: Content-Type: application/json, Accept: application/json
-- Error handling: Basic (throw on non-2xx responses, catch and log)
-- No retry logic implemented
-- No request rate limiting
+**Feature Flags:**
+- `FEATURES.enableVoiceInput` - false (voice input disabled)
+- `FEATURES.enableOfflineMode` - true (offline cache enabled)
+- `FEATURES.enableChatHistory` - true (conversation history enabled)
+- Defined in: `src/config.js`
 
-**WebView Communication:**
-- React Native ↔ WebView message passing
-- Methods: `postMessage`, event listeners
-- Purpose: Controlling avatar animations and speech playback
+## Webhooks & Callbacks
 
-## Data Flow
+**Incoming Webhooks:**
+- None detected
 
-**Chat Flow:**
-1. User enters message in app
-2. App sends to chatcamille.ai API
-3. AI returns reply text
-4. Text queued for speech synthesis via Avatar Speech API
-5. Speech synthesis returns audio + viseme data
-6. Audio cached locally
-7. Speech sent to WebView for avatar animation playback
-8. Chat history stored in Redux + MMKV
+**Outgoing Webhooks:**
+- None detected
 
-**Authentication Flow:**
-1. User enters name → searches MBTS API by first name
-2. Candidate users returned (name matches)
-3. System asks verification questions from MBTS user profile
-4. User answers questions
-5. System filters candidate users by answers
-6. `POST /users/getPersonById` called to verify final candidate
-7. User marked authenticated in state
-8. Retrieved user's avatar preference loaded
+**Event-Based Communication:**
+- WebView Event Messages (bidirectional message passing)
+  - Avatar Web View sends: `avatar_ready`, `speech_finished`, `avatar_error` events
+  - App sends: `setAvatar`, `setBackground`, `setMood`, `speakAudio` commands
+  - Implementation: `src/app/index.tsx` (handleAvatarEvent callback)
+
+**WebSocket/Real-time:**
+- None detected - All integrations are request-response (HTTP/fetch)
+
+## External Service Dependencies
+
+**Critical Path (Required for Core Functionality):**
+1. ChatCamille API (`https://www.chatcamille.ai/api/chat`) - Chat responses
+2. MBTS Backend (`https://mbts-3d-staging-a97d3e5c7d7c.herokuapp.com/`) - User authentication
+3. Avatar Speech API (TTS service) - Voice synthesis
+4. Avatar WebView (Vercel) - 3D avatar rendering
+
+**Optional (Graceful Degradation):**
+- Health check endpoint - Performance optimization only (warms dyno)
+- Speech cache - Performance optimization (falls back to live synthesis)
+
+**Fallback Strategy:**
+- All API URLs have environment variable overrides + sensible fallbacks in `src/config.js`
+- Speech synthesis errors: Error message logged, speech queue advanced
+- Chat API errors: User shown error message "I could not reach BOTCierge right now"
+- Avatar auth errors: User directed to register at BOTCIERGE.com
 
 ---
 

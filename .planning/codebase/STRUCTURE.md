@@ -5,232 +5,230 @@
 ## Directory Layout
 
 ```
-project-root/
-├── src/                           # Application source code
-│   ├── app/                       # Expo Router entry points (file-based routing)
-│   ├── assets/                    # Static images and media
-│   ├── components/                # Reusable UI components
-│   ├── constants/                 # App-wide theme and constants
-│   ├── data/                      # Static data (avatars manifest)
-│   ├── hooks/                     # Custom React hooks
-│   ├── redux/                     # Redux store (legacy persistence)
-│   ├── screens/                   # Screen components (legacy folder, unused)
-│   ├── services/                  # Infrastructure services
-│   ├── stores/                    # Zustand state stores
-│   ├── types/                     # TypeScript type definitions
-│   ├── utils/                     # Utility functions
-│   ├── config.js                  # Centralized configuration
-│   └── global.css                 # Global styles
-├── assets/                        # Public assets (compiled avatar backgrounds)
-├── android/                       # Android native code
-├── ios/                           # iOS native code
-├── .planning/                     # Project planning (GSD workflow)
-├── package.json                   # Dependencies and scripts
-├── tsconfig.json                  # TypeScript configuration
-├── app.json                       # Expo app configuration
-└── eslintrc                       # Linting rules
+mbts-3d-native-spike/
+├── .planning/          # GSD orchestration files
+├── android/            # Android native code (Gradle, manifests)
+├── assets/             # App icons, backgrounds, splash screens
+├── avatar-embed/       # Separate avatar web runtime (built separately)
+├── docs/               # Documentation
+├── plugins/            # Expo plugins (with-adjust-nothing)
+├── scripts/            # Build scripts (reset-project, build-avatar-embed)
+├── src/
+│   ├── app/            # Expo Router navigation & screens
+│   ├── assets/         # App-local images
+│   ├── components/     # Reusable React Native components
+│   ├── constants/      # Theme, hardcoded values
+│   ├── data/           # Static data (avatar lists)
+│   ├── hooks/          # Custom React hooks
+│   ├── redux/          # Redux slices & store (legacy, unused in main flow)
+│   ├── screens/        # Screen components (legacy, use app/ instead)
+│   ├── services/       # Service utilities (bundle mgmt, API)
+│   ├── stores/         # Zustand store definitions
+│   ├── types/          # TypeScript type definitions
+│   └── utils/          # Utility functions & helpers
+├── app.json            # Expo configuration
+├── package.json        # Dependencies & scripts
+└── tsconfig.json       # TypeScript configuration
 ```
 
 ## Directory Purposes
 
-**src/app/**
-- Purpose: Expo Router entry points and layout composition
-- Contains: Route definitions (file-based), layout wrappers, provider setup
+**src/app/:**
+- Purpose: Expo Router file-based routing
+- Contains: Root layout (_layout.tsx), home screen (index.tsx)
+- Key files: `_layout.tsx` (providers), `index.tsx` (main UI)
+- Pattern: Each .tsx file is a route; dynamic routes use [param] syntax
+- NOTE: Currently has only root layout and index; consider migrating legacy screens/ here
+
+**src/components/:**
+- Purpose: Reusable UI components
+- Contains: Avatar integration (avatar/), modals for various actions, theme components, UI primitives
+- Subdirectories:
+  - `avatar/` → AvatarWebView.js (3D avatar bridge), avatarBridge.js (message protocol), avatarSession.js (lifecycle), speechProvider.js (speech configuration)
+  - `ui/` → collapsible.tsx (generic UI primitives)
+  - `xshare/` → PostNeedForm.js (legacy feature)
+- Pattern: Modular, self-contained; imports from stores and hooks as needed
+
+**src/stores/:**
+- Purpose: Zustand state store definitions
+- Contains: Avatar settings, chat state, messages, speech queue
+- Key files: `avatarStore.ts` (avatar selections + persistence), `chatStore.ts` (messages, auth state, conversation history)
+- Pattern: Factory patterns creating hooks; stores manage their own setters
+
+**src/hooks/:**
+- Purpose: Custom React hooks encapsulating business logic
+- Contains: Auth flow, speech synthesis, chat mutations, person verification
 - Key files:
-  - `_layout.tsx`: Root layout with QueryClientProvider, ThemeProvider, splash overlay
-  - `index.tsx`: Default route (/) - main home screen with avatar and chat
+  - `useAuthFlow.ts` → Multi-step authentication challenge & verification
+  - `useSendMessage.ts` → React Query mutation for chat API
+  - `useSpeech.ts` → Speech synthesis orchestration with caching & prefetch
+  - `useGetPerson.ts` → Identity verification API call
+  - `use-color-scheme.ts` → Platform-specific theme detection
+  - `use-theme.ts` → Theme provider hook
+- Pattern: React hooks returning state, mutations, or callback functions
 
-**src/assets/**
-- Purpose: Static image assets used in the app
-- Contains: PNG/JPG files for avatar backgrounds, icons
-- Structure:
-  - `avatar-backgrounds/`: Background images (bg1.jpg, bg_dubai.jpg, etc.)
-  - `images/`: App icons and logos
+**src/types/:**
+- Purpose: TypeScript type definitions
+- Contains: Chat types, Avatar types
+- Key files: `chat.ts` (ChatMessage, CandidateUser, AuthProperty, ChatStep), `avatar.ts` (AvatarOption, AvatarVoiceOption, AvatarEvent)
+- Pattern: Exported type/interface definitions; no implementations
 
-**src/components/**
-- Purpose: Reusable UI components organized by feature
-- Key subdirectories:
-  - `avatar/`: Avatar WebView and bridge components (AvatarWebView.js, avatarBridge.js, speechProvider.js)
-  - `ui/`: Shared UI elements (collapsible.tsx)
-  - `xshare/`: Legacy share feature components
+**src/services/:**
+- Purpose: Business logic services for complex operations
+- Contains: Avatar bundle management, API utilities
 - Key files:
-  - Modal components: `AddPhoneNumberModal.js`, `ScheduleModal.js`, `ViewTodoListModal.js`, etc.
-  - Themed components: `themed-text.tsx`, `themed-view.tsx`
-  - Animation component: `animated-icon.tsx` (web variant: `animated-icon.web.tsx`)
-  - App tabs: `app-tabs.tsx` (web variant: `app-tabs.web.tsx`)
+  - `avatarBundleManager.js` → Download, cache, and version avatar web runtime
+  - `HelperData.js` → Legacy data structures (deprecated)
+  - `intents.js` → Intent classification (legacy)
+- Pattern: Pure functions or utilities; no class-based services
 
-**src/constants/**
-- Purpose: App-wide constants and theme configuration
+**src/utils/:**
+- Purpose: General utility functions
+- Contains: API config, storage, caching, data parsing
 - Key files:
-  - `theme.ts`: Color palette, typography, spacing constants
+  - `api.js` → Centralized API endpoint URLs (MBTS_API_URL, AVATAR_SPEECH_API_URL)
+  - `mmkv.js` → Encrypted persistent storage instance
+  - `speechCache.ts` → File-system-based speech audio cache with hash-keyed lookup
+  - `dateUtils.js` → Date manipulation helpers
+  - `Activity.js` → Legacy activity tracking (unused)
+- Pattern: Functional utilities; no state; single responsibility
 
-**src/data/**
-- Purpose: Static data files (manifests, lookups)
-- Key files:
-  - `avatars.js`: Avatar metadata and configuration
+**src/constants/:**
+- Purpose: Hardcoded constants and theme definitions
+- Contains: Theme colors, typography, spacing
+- Key files: `theme.ts` → Color palette for light/dark modes
 
-**src/hooks/**
-- Purpose: Custom React hooks encapsulating feature logic
-- Key files:
-  - `useAuthFlow.ts`: Authentication challenge-response logic
-  - `useGetPerson.ts`: Fetch verified person from backend
-  - `useSendMessage.ts`: Chat API mutation (React Query)
-  - `useSpeech.ts`: Text-to-speech orchestration
-  - `use-color-scheme.ts`: Platform color scheme detection
-  - `use-theme.ts`: Theme context hook
+**src/data/:**
+- Purpose: Static application data
+- Contains: Avatar metadata and options
+- Key files: `avatars.js` → Avatar definitions (name, id, default voice)
 
-**src/redux/**
-- Purpose: Redux store for persistent user data (legacy, being phased out)
-- Contains: Redux Toolkit store configuration, slices, reducers, MMKV storage adapter
-- Key files:
-  - `store/store.js`: Store initialization with redux-persist
-  - `slices/personSlice.js`: User person data reducer
-  - `slices/postSlice.js`: Post/activity data reducer
-  - `slices/xShareSlice.js`: Share feature reducer
-  - `reducers/rootReducer.js`: Combined reducer
-  - `storage/storage.js`: MMKV storage adapter for persistence
+**src/redux/ & src/screens/:**
+- Status: Legacy code
+- Purpose: Redux-based state (superseded by Zustand); old screen definitions (superseded by Expo Router)
+- Note: Not actively used in main flow; consider removing in future refactor
 
-**src/screens/**
-- Purpose: Legacy screen components (not actively used in current app)
-- Status: Mostly replaced by Expo Router routes in `src/app/`
+**app.json:**
+- Purpose: Expo application configuration
+- Contains: App name, version, icons, permissions, plugins, build settings
+- Key sections: ios/android-specific settings, expo-router plugin, expo-splash-screen plugin
 
-**src/services/**
-- Purpose: Infrastructure services for system-level operations
-- Key files:
-  - `avatarBundleManager.js`: Download/cache avatar web bundle and GLBs
-    - Functions: `downloadCoreBundle()`, `downloadAvatarGlb()`, `isAvatarGlbCached()`, `preloadAllGlbs()`, `clearBundle()`
-    - Caching: Uses expo-file-system to store bundles locally
-  - `HelperData.js`: Data transformation and helper utilities
-  - `intents.js`: Intent parsing logic
-
-**src/stores/**
-- Purpose: Zustand state management stores for reactive UI state
-- Key files:
-  - `avatarStore.ts`: Avatar selection state (avatar ID, voice, emotion, background, selector visibility)
-  - `chatStore.ts`: Chat and authentication state (messages, speech queue, conversation history, guest name, auth flow)
-
-**src/types/**
-- Purpose: TypeScript type definitions and interfaces
-- Key files:
-  - `avatar.ts`: AvatarOption, AvatarVoiceOption, AvatarRuntimeDescriptor, AvatarEvent types
-  - `chat.ts`: ChatMessage, ChatApiResponse, CandidateUser, AuthProperty, ChatStep types
-  - `assets.d.ts`: Asset module declarations (image requires)
-
-**src/utils/**
-- Purpose: Utility functions and helpers
-- Key files:
-  - `mmkv.js`: MMKV storage adapter for Zustand persistence
-  - `speechCache.ts`: Caching layer for text-to-speech audio payloads
-
-**src/config.js**
-- Purpose: Centralized configuration and environment variables
-- Contains:
-  - API endpoints: `MBTS_API_URL`, `AVATAR_SPEECH_API_URL`, `AVATAR_WEB_VIEW_URL`
-  - Derived endpoints: `SPEECH_SYNTHESIS_ENDPOINT`, `SPEECH_HEALTH_ENDPOINT`
-  - Feature flags: `enableVoiceInput`, `enableOfflineMode`, `enableChatHistory`
-  - Defaults: `DEFAULT_AVATAR_ID`, `DEFAULT_SPEECH_TEXT`
+**assets/:**
+- Purpose: Static assets (app icons, backgrounds, splash screens)
+- Contains: PNG images for iOS, Android adaptive icons, avatar scene backgrounds
 
 ## Key File Locations
 
 **Entry Points:**
-- `src/app/_layout.tsx`: App root with providers
-- `src/app/index.tsx`: Main home screen (default route /)
+- `src/app/_layout.tsx`: Root layout with QueryClient, ThemeProvider setup; health check for speech backend
+- `src/app/index.tsx`: Main HomeScreen (1000+ lines); avatar panel, chat UI, input, settings modal
+- `app.json`: Expo configuration read on app startup
 
 **Configuration:**
-- `src/config.js`: API endpoints and feature flags
-- `app.json`: Expo app metadata and build config
-- `tsconfig.json`: TypeScript compiler options
-- `package.json`: Dependencies and scripts
+- `src/config.js`: Centralized API URLs, feature flags (enableVoiceInput, enableOfflineMode, enableChatHistory)
+- `src/utils/api.js`: Derived API URLs (baseURL, avatarSpeechBaseURL)
 
 **Core Logic:**
-- `src/hooks/useSendMessage.ts`: Chat API integration
-- `src/hooks/useAuthFlow.ts`: Authentication flow
-- `src/hooks/useSpeech.ts`: Text-to-speech synthesis
-- `src/services/avatarBundleManager.js`: Asset caching and offline support
+- `src/stores/chatStore.ts`: Chat messages, conversation history, auth flow state
+- `src/stores/avatarStore.ts`: Avatar selections, background, emotion, voice
+- `src/hooks/useSendMessage.ts`: Chat API integration with conversation context
+- `src/hooks/useAuthFlow.ts`: Multi-step identity verification logic
+- `src/hooks/useSpeech.ts`: Speech synthesis pipeline with caching & prefetch
 
-**State Management:**
-- `src/stores/avatarStore.ts`: Avatar UI state (Zustand)
-- `src/stores/chatStore.ts`: Chat and auth state (Zustand)
-- `src/redux/store/store.js`: Redux store setup (legacy persistence)
+**Avatar/WebView:**
+- `src/components/avatar/AvatarWebView.js`: React Native WebView bridge (forwardRef, lifecycle management)
+- `src/components/avatar/avatarBridge.js`: Message protocol (payload building, URL construction)
+- `src/services/avatarBundleManager.js`: Local bundle caching and download orchestration
+
+**Styling:**
+- Inline StyleSheet.create() in component files (no separate CSS modules)
+- `src/constants/theme.ts`: Centralized color constants used throughout
 
 **Testing:**
-- Test files are co-located with source files (not detected in current codebase)
-- No test configuration found (jest.config or vitest.config)
+- No test files present in src/; no jest/vitest configuration
 
 ## Naming Conventions
 
 **Files:**
-- React components: PascalCase (e.g., `AddPhoneNumberModal.js`, `AvatarWebView.js`)
-- Hooks: camelCase with `use` prefix (e.g., `useSendMessage.ts`, `useAuthFlow.ts`)
-- Utilities: camelCase (e.g., `speechCache.ts`, `mmkv.js`)
-- Types: PascalCase for type/interface names (e.g., `ChatMessage`, `AvatarOption`)
-- Config/constants: camelCase (e.g., `config.js`, `theme.ts`)
+- Component files: PascalCase.tsx (e.g., `AvatarWebView.js`, `ActivityLedgerModal.js`)
+- Hook files: use{Name}.ts/tsx (e.g., `useAuthFlow.ts`, `useSpeech.ts`)
+- Utility files: camelCase.js/ts (e.g., `speechCache.ts`, `dateUtils.js`)
+- Type files: {type}.ts (e.g., `chat.ts`, `avatar.ts`)
+- Store files: {name}Store.ts (e.g., `avatarStore.ts`, `chatStore.ts`)
+- Test files (if added): {name}.test.ts or {name}.spec.ts
 
 **Directories:**
-- Feature folders: kebab-case or camelCase (e.g., `avatar/`, `xshare/`)
-- Feature groups: camelCase plural (e.g., `components/`, `hooks/`, `stores/`, `services/`)
+- kebab-case: No, directories use camelCase or PascalCase
+- Actual convention: camelCase for feature directories (app, components, hooks, stores, types, utils, services)
+- Subdirectories: avatar (avatar-specific), ui (generic UI), xshare (legacy feature)
 
-**Components (internal naming):**
-- Exports: Export default for screen/page components, named exports for utility components
-- Styles: `StyleSheet.create()` with object key pattern (e.g., `styles.screen`, `styles.inputBar`)
-- Props types: Define inline in component file or import from `types/` directory
+**Variables & Functions:**
+- Functions: camelCase (e.g., `sendMessage()`, `handleAuthMessage()`)
+- Constants: UPPER_SNAKE_CASE (e.g., `DEFAULT_AVATAR_ID`, `AUTH_PROPERTIES`)
+- Zustand stores: camelCase with `use` prefix (e.g., `useAvatarStore`, `useChatStore`)
+- Destructured state: camelCase (e.g., `{ avatarOptions, selectedAvatarId }`)
+
+**CSS Classes/Styles:**
+- StyleSheet keys: camelCase (e.g., `screen`, `chatScroller`, `messageRow`)
+- No CSS class names (React Native uses inline StyleSheets)
 
 ## Where to Add New Code
 
-**New Feature (requires chat interaction, avatar response):**
-- API hook: `src/hooks/use[Feature].ts` - React Query mutation or custom logic
-- Store updates: Add to `src/stores/chatStore.ts` if affects chat/auth state
-- Type definitions: `src/types/chat.ts` for new response types
-- Home screen integration: Update `src/app/index.tsx` to handle new feature in message send flow
+**New Feature (end-to-end):**
+1. **Type definitions**: Add to `src/types/` (e.g., `src/types/newFeature.ts`)
+2. **State management**: Add to `src/stores/` if global (e.g., `src/stores/newFeatureStore.ts`)
+3. **Business logic**: Add to `src/hooks/` (e.g., `src/hooks/useNewFeature.ts`)
+4. **API integration**: Add fetch logic in hooks or services; update `src/config.js` for URLs
+5. **UI components**: Add to `src/components/` (e.g., `src/components/NewFeatureModal.tsx`)
+6. **Routing**: Add screen to `src/app/` using Expo Router file structure (e.g., `src/app/newFeature.tsx`)
 
-**New Component/Modal (UI feature):**
-- Implementation: `src/components/[FeatureName]Modal.js` (if modal) or `src/components/[FeatureName].tsx`
-- Use case: Modal components for capture form, display options, view details
-- Pattern: Controlled via Zustand store (visibility flag) or parent props
-- Styling: StyleSheet.create() at file bottom
+**New Component/Module (isolated):**
+- Implementation: `src/components/{name}.tsx` (if reusable) or inline in screen
+- Styling: Use `StyleSheet.create()` inline or co-locate in same file
+- Props: Define TypeScript interface at top of file (no separate .d.ts needed for simple components)
 
-**New Avatar State (selection option, animation):**
-- Store action: `src/stores/avatarStore.ts` - add state field + setter
-- WebView bridge: `src/components/avatar/avatarBridge.js` - encode command if needed
-- Home screen: `src/app/index.tsx` - wire up selector dropdown or control
-- Type: `src/types/avatar.ts` - update AvatarOption or AvatarStore interface
+**Utilities:**
+- Shared helpers: `src/utils/{name}.ts` (e.g., `src/utils/speechCache.ts`)
+- Feature-specific utils: Co-locate in same directory as feature
+- API endpoints: Add to `src/config.js`; derive URLs in `src/utils/api.js`
 
-**New Utility/Service:**
-- Shared utilities: `src/utils/[utility].ts` - functions for data transformation, caching, etc.
-- System services: `src/services/[service].js` - file I/O, network, native bridge operations
-- Import path: Use path alias `@/` (configured in tsconfig.json)
+**Hooks:**
+- Generic reusable logic: `src/hooks/use{Name}.ts`
+- Complex state + effects: `src/hooks/use{Name}.ts` (follow React hooks conventions)
+- Direct store access: Prefer hooks over direct `store.getState()` calls in components
 
-**New Screen/Route:**
-- File: `src/app/[routeName]/index.tsx` (Expo Router file-based convention)
-- Layout: `src/app/[routeName]/_layout.tsx` (if needs nested routing)
-- Provider: Ensure wrapped by `_layout.tsx` providers (QueryClientProvider, ThemeProvider)
+**Types:**
+- Global types: `src/types/{domain}.ts` (e.g., `src/types/chat.ts`)
+- Component-local types: Define at top of component file (export if reused)
+- API response types: Co-locate with hooks or in `src/types/`
 
 ## Special Directories
 
-**node_modules/**
-- Purpose: Installed dependencies
-- Generated: Yes (via `npm install` or `npm ci`)
-- Committed: No (gitignored)
+**Redux (src/redux/):**
+- Purpose: Legacy Redux setup (slices, store configuration)
+- Generated: No, manually maintained
+- Committed: Yes
+- Status: Superseded by Zustand; kept for backward compatibility
+- Migration: Remove after confirming no active Redux subscribers
 
-**android/, ios/**
-- Purpose: Platform-specific native code and build artifacts
-- Generated: Android: compiled from Gradle, iOS: compiled from Xcode
-- Committed: Partially (source files committed, build artifacts gitignored)
+**Screens (src/screens/):**
+- Purpose: Legacy screen components (old navigation structure)
+- Generated: No
+- Committed: Yes
+- Status: Superseded by Expo Router (src/app/); consider migrating/removing
+- Note: Old modals and screens still live here but are imported into app/index.tsx
 
-**.expo/**
-- Purpose: Expo CLI cache and metadata
-- Generated: Yes (created by `expo start`, `expo run:android`, `expo run:ios`)
-- Committed: No (gitignored)
+**Avatar-embed (avatar-embed/ at root):**
+- Purpose: Separate Vercel-deployed web runtime for 3D avatar
+- Generated: Yes, built via `npm run build:avatar-embed`
+- Committed: No, built separately; included in CI/CD
+- Note: Contains Three.js 3D rendering, speech animation, avatar models (GLBs)
 
-**.planning/codebase/**
-- Purpose: GSD workflow documentation (architecture, structure, concerns)
-- Generated: No (manually created by GSD tools)
-- Committed: Yes (reference documents for future phases)
-
-**.planning/phases/**
-- Purpose: Implementation phase plans (sprint tasks, checklist)
-- Generated: No (created by `/gsd-plan-phase`)
-- Committed: Yes (reference for tracking implementation progress)
+**Assets:**
+- Purpose: App icons, splash screens, backgrounds
+- Generated: No, manually curated
+- Committed: Yes
+- Structure: PNG images for iOS/Android/web; backgrounds in JPEG format (avatar scene backgrounds)
 
 ---
 

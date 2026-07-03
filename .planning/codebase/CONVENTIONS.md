@@ -5,230 +5,187 @@
 ## Naming Patterns
 
 **Files:**
-- React components and hooks: kebab-case with `.tsx` or `.ts` extension
-  - Examples: `animated-icon.tsx`, `use-color-scheme.ts`, `themed-text.tsx`
-  - Store files: PascalCase followed by domain (e.g., `chatStore.ts`, `avatarStore.ts`)
-- Type definition files: snake_case or domain-based naming
-  - Examples: `chat.ts`, `avatar.ts`, `assets.d.ts`
+- Hook files: Inconsistent - some use kebab-case (`use-color-scheme.ts`, `use-theme.ts`), others use camelCase (`useGetPerson.ts`, `useSpeech.ts`, `useAuthFlow.ts`, `useSendMessage.ts`). Newer hooks prefer camelCase.
+- Component files: PascalCase (`AnimatedIcon.tsx`, `ThemedText.tsx`, `AppTabs.tsx`)
+- Store files: camelCase with "Store" suffix (`avatarStore.ts`, `chatStore.ts`)
+- Type files: camelCase describing the domain (`avatar.ts`, `chat.ts`)
+- Utility files: camelCase (`speechCache.ts`, `mmkv.js`)
 
 **Functions:**
-- camelCase for all function names, both exported and internal
-  - Examples: `addMessage()`, `sendMessage()`, `handleAuthMessage()`, `useAuthFlow()`
-  - Hook names: prefixed with `use` (e.g., `useChatStore()`, `useSpeech()`, `useAuthFlow()`)
-  - Utility functions: camelCase (e.g., `normalizeAvatarMessage()`, `getPersistedBackground()`)
+- Hook functions: Prefix with "use" in camelCase (e.g., `useGetPerson()`, `useSpeech()`, `useAuthFlow()`, `useSendMessage()`)
+- Helper functions: camelCase (e.g., `buildHelloMessage()`, `getPersistedBackground()`, `getCachedSpeech()`, `cacheSpeech()`, `hashKey()`)
+- Function names are descriptive and represent what they do
 
 **Variables:**
-- camelCase for all local and state variables
-  - Examples: `guestName`, `selectedAvatarId`, `isReplying`, `conversationHistory`
-  - Boolean flags: `is*` prefix (e.g., `isReplying`, `isSelectorOpen`)
-  - Ref objects: `*Ref` suffix (e.g., `scrollViewRef`, `lastDispatchedRef`)
+- Local variables: camelCase (`selectedAvatar`, `conversationHistory`, `lastDispatchedRef`, `activeSpeech`, `nextSpeech`)
+- State variables: camelCase (`chatStep`, `guestName`, `authenticated`, `isReplying`)
+- Ref objects: camelCase with "Ref" suffix (`avatarWebViewRef`, `lastDispatchedRef`)
 
 **Types:**
-- PascalCase for all type definitions
-  - Interface patterns: `interface ChatStore { ... }`
-  - Type aliases: `type ChatMessage = { ... }`
-  - Examples: `CandidateUser`, `AvatarOption`, `AuthProperty`, `ConversationTurn`
+- Type definitions: PascalCase (e.g., `ChatMessage`, `AvatarOption`, `PersonResponse`, `ChatApiResponse`, `CandidateUser`, `ConversationTurn`, `AvatarEvent`)
+- Interface definitions: PascalCase (e.g., `AvatarWebViewRef`, `UseSpeechParams`, `ChatStore`, `AvatarStore`)
+- Enum/union types: PascalCase (e.g., `AuthProperty`, `ChatStep`)
+- Type property names: camelCase
 
 **Constants:**
-- UPPER_SNAKE_CASE for all constants and configuration values
-  - Examples: `AUTH_PROPERTIES`, `DEFAULT_AVATAR_ID`, `CHAT_API_URL`, `SPEECH_HEALTH_ENDPOINT`
-  - Configuration arrays: same pattern (e.g., `EMOTION_OPTIONS`, `BACKGROUND_OPTIONS`)
-  - Hardcoded values in constants: same pattern (e.g., `AUTH_FAILURE_PROMPT`)
+- Module-level constants: UPPER_SNAKE_CASE (`CACHE_PREFIX`, `AUTH_PROPERTIES`, `AUTH_FAILURE_PROMPT`, `DEFAULT_AVATAR_ID`, `SPEECH_SYNTHESIS_ENDPOINT`, `SPEECH_HEALTH_ENDPOINT`, `CHAT_API_URL`, `DEFAULT_AVATAR_OPTIONS`, `EMOTION_OPTIONS`, `BACKGROUND_OPTIONS`, `INITIAL_SCALE_FACTOR`, `DURATION`, `MaxContentWidth`, `BottomTabInset`)
+- Array constants: UPPER_SNAKE_CASE (e.g., `CDN_BACKGROUNDS`, `AUTH_PROPERTIES`)
 
 ## Code Style
 
 **Formatting:**
-- No Prettier configuration detected; using ESLint's built-in formatting rules
-- Indent: 2 spaces (enforced by ESLint config-expo)
-- Line length: No explicit limit observed in code
-- Semicolons: Required (enforced by ESLint)
-- Quotes: Double quotes for strings (enforced by ESLint)
+- No Prettier config detected
+- Uses ESLint with `eslint-config-expo` for linting
+- TypeScript strict mode enabled in `tsconfig.json`
+- 2-space indentation (observed in source files)
 
 **Linting:**
-- Tool: ESLint 9.0.0 with `eslint-config-expo` (~56.0.4)
-- Config location: `eslint.config.js` (flat config format)
-- Run command: `npm run lint` or `expo lint`
-- Default ignores: `dist/*`
+- ESLint configuration: `eslint.config.js` using flat config format
+- Extends: `eslint-config-expo`
+- Ignores: `dist/*`
+- Run: `npm run lint` (executes `expo lint`)
+
+**Type Strictness:**
+- TypeScript `strict: true` in `tsconfig.json`
+- `allowJs: true` (allows mixing .js and .ts files)
+- `checkJs: false` (doesn't check JavaScript files)
+- All exports include explicit type annotations where appropriate (e.g., function return types)
 
 ## Import Organization
 
 **Order:**
-1. React core and React Native imports
-2. Third-party library imports (expo-*, react-native-*, @react-navigation/*, etc.)
-3. Local absolute imports using path aliases (`@/...`)
-4. Local relative imports (rarely used)
-
-**Pattern:**
-```typescript
-// React and React Native
-import { useState, useCallback } from 'react';
-import { View, StyleSheet, Pressable } from 'react-native';
-
-// Third-party libraries
-import { create } from 'zustand';
-import { useMutation } from '@tanstack/react-query';
-import Animated, { useAnimatedKeyboard } from 'react-native-reanimated';
-
-// Local imports with path aliases
-import { useChatStore } from '@/stores/chatStore';
-import type { ChatMessage, AuthProperty } from '@/types/chat';
-import { mmkvStorage } from '@/utils/mmkv';
-```
+1. React and React Native imports (e.g., `import { useEffect } from 'react'`)
+2. Expo imports (e.g., `import { Image } from 'expo-image'`, `import { StatusBar } from 'expo-status-bar'`)
+3. Third-party library imports (e.g., `import Animated from 'react-native-reanimated'`, `import { QueryClientProvider } from '@tanstack/react-query'`)
+4. Internal imports using path aliases (e.g., `import { useChatStore } from '@/stores/chatStore'`, `import type { ChatMessage } from '@/types/chat'`)
+5. Relative imports for sibling files (rare in this codebase)
 
 **Path Aliases:**
-- `@/*` → `./src/*` (primary alias for all source code)
-- `@/assets/*` → `./assets/*` (secondary alias for assets)
-- Used in all imports across the codebase
-- TypeScript configuration: `tsconfig.json` with strict mode enabled
+- `@/*` → `./src/*` - Used for most internal imports
+- `@/assets/*` → `./assets/*` - Used for asset imports
+- Type imports: Use `import type { TypeName }` for type-only imports (e.g., `import type { CandidateUser, PersonResponse } from '@/types/chat'`)
+
+**Import grouping in practice:**
+```typescript
+// First: React/React Native
+import { useEffect, useRef } from 'react';
+import { View, StyleSheet } from 'react-native';
+
+// Second: Expo
+import { Image } from 'expo-image';
+
+// Third: Third-party
+import { useMutation } from '@tanstack/react-query';
+import Animated from 'react-native-reanimated';
+
+// Fourth: Internal (stores, hooks, types, utilities)
+import { useChatStore } from '@/stores/chatStore';
+import { useGetPerson } from '@/hooks/useGetPerson';
+import type { ChatMessage } from '@/types/chat';
+import { cacheSpeech } from '@/utils/speechCache';
+```
 
 ## Error Handling
 
 **Patterns:**
-- Try-catch blocks for async operations
-- Fallback return values with `.catch(() => (defaultValue))`
-- Network errors: JSON parsing failures caught and replaced with empty objects
-  - Example: `(await response.json().catch(() => ({}))) as ResponseType`
-- User-visible errors: wrapped in try-catch-finally with user messages
-- Silent errors: console.log for non-critical failures (e.g., speech synthesis prefetch)
+- Try/catch blocks used for async operations and file I/O (e.g., `src/utils/speechCache.ts` line 37-46, `src/hooks/useSpeech.ts` line 79-84)
+- Silent error handling in non-critical paths: `catch { return null }` or `catch { /* best-effort, ignore errors */ }`
+- Error logging to console: `console.log('[context][error]', err)` with context prefix
+- User-facing error messages: Shown via state updates that trigger UI changes
+- Fallback values using nullish coalescing: `avatar?.label ?? selectedAvatarId`
+- Optional chaining for safe property access: `avatarWebViewRef.current?.speakAudio()`
 
-**Example Pattern:**
-```typescript
-try {
-  const result = await fetchData();
-  // handle success
-} catch (err) {
-  const message = err instanceof Error ? err.message : 'Default error message';
-  addAvatarMessage(message);
-} finally {
-  setIsReplying(false);
-}
-```
-
-**Response Validation:**
-- Check `response.ok` before processing
-- Validate response type/status fields from API responses
-- Example: `if (!response.ok || json.type !== 'person' || json.status !== 'OK')`
+**Specific examples:**
+- `useGetPerson.ts`: Throws error with user message if verification fails (line 20)
+- `useSpeech.ts`: Silently catches TTS errors after logging (line 81), advances queue to prevent blocking
+- `speechCache.ts`: All file operations wrapped in try/catch returning null on error (line 37-46, 49-62)
+- `useAuthFlow.ts`: Input validation with conditional guards, user-facing messages via `addAvatarMessage()`
 
 ## Logging
 
-**Framework:** Native `console` object (no logging library)
+**Framework:** `console` (native console API)
 
 **Patterns:**
-- `console.log()` for error diagnostics and debug info
-- Formatted with context tags: `[functionName][type]` prefix
-  - Example: `console.log('[useSpeech][error]', err)`
-- Used minimally; mostly in error paths
-- No info/warn/debug levels used
+- Format: `console.log('[context][operation]', data)` with bracket-enclosed context
+- Examples:
+  - `'[speechCache] hit: ' + text.slice(0, 40)` - Cache hit logging
+  - `'[speechCache] write-error'` - Error logging
+  - `'[useSpeech][error]'` - Hook error logging
+- Used for debugging, not for application state
+- Errors logged with descriptive prefixes showing which module/operation failed
 
 ## Comments
 
 **When to Comment:**
-- Complex business logic: logic explaining WHY, not WHAT (see `useAuthFlow.ts`)
-- Algorithm explanations: how matching/filtering works
-- Prefetch logic: explaining optimization strategies
-- Generally minimal; code is self-documenting through naming
+- Explain "why" decisions, not "what" the code does
+- Clarify non-obvious algorithms or state management patterns
+- Document business logic (e.g., authentication flow, emotion mapping)
+- Mark work in progress or known limitations
 
-**JSDoc/TSDoc:**
-- Not systematically used in source code
-- Type-driven documentation: TypeScript types replace most comments
-- Interface/type exports are self-documenting
+**TSDoc/JSDoc:**
+- Used for major functions and utilities
+- Example from `src/constants/theme.ts`:
+  ```typescript
+  /**
+   * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
+   * There are many other ways to style your app...
+   */
+  ```
+- Platform-specific documentation: `/** iOS UIFontDescriptorSystemDesignDefault */`
 
-**Example of Good Comments:**
-```typescript
-// Prefetch next speech item while current plays.
-useEffect(() => {
-  if (!nextSpeech?.text) return;
-  // ... prefetch logic
-}, [nextSpeech?.id, nextSpeech?.text, selectedAvatar.id, /* ... */]);
-```
+**Inline Comments:**
+- Used sparingly, only when logic isn't self-documenting
+- Example: `// Synthesize and play active speech item.` - describes an entire useEffect block
+- Example: `// best-effort prefetch, ignore errors` - explains error handling strategy
 
 ## Function Design
 
-**Size:**
-- Most functions 10-50 lines (seen in hooks like `useSpeech`, `useAuthFlow`)
-- Larger functions reserved for components with complex UI logic (e.g., `HomeScreen` is 1017 lines but heavily UI)
-- Favor extracting utilities and logic into separate functions
+**Size:** Functions are generally 10-40 lines; longer functions (70+ lines) like `useSpeech()` break functionality into logical sections with comments
 
 **Parameters:**
-- Destructured parameters for multiple related values
-  - Example: `({ avatarWebViewRef, selectedAvatar, selectedEmotionId, selectedVoice }: UseSpeechParams)`
-- Use TypeScript interfaces for parameter groups (e.g., `UseSpeechParams`)
-- Single parameter if only one value needed
+- Named parameters via object destructuring for hooks: `useGetPerson()` takes no params; `useSpeech()` destructures `{ avatarWebViewRef, selectedAvatar, selectedEmotionId, selectedVoice }`
+- Type-safe: All parameters have explicit TypeScript types
+- Optional properties use `?:` syntax: `voice?: AvatarVoiceOption | null`
 
 **Return Values:**
-- Explicit return types via TypeScript
-- Functions return objects for multiple values (e.g., hooks return `{ isPlaying: ... }`)
-- Promise types explicitly declared in async functions
-
-**Example Function:**
-```typescript
-function getLimit(property: AuthProperty): number {
-  return property === 'mothersMaidenName' ? 50 : 30;
-}
-
-const addAvatarMessage = useCallback((message: string) => {
-  const id = `${Date.now()}-avatar`;
-  const normalized = normalizeAvatarMessage(message);
-  addMessage({ id, message: normalized, me: false });
-  addSpeechItem({ id, text: normalized });
-}, [addMessage, addSpeechItem]);
-```
+- Hooks return objects with named properties: `{ isPlaying: speechQueue.length > 0 }`
+- Async functions return typed Promises: `Promise<CandidateUser>`, `Promise<WebViewSpeechPayload | null>`
+- Functions return early on validation failures (guard clauses)
+- Null/undefined used consistently for absent values
 
 ## Module Design
 
 **Exports:**
-- Named exports for utilities and hooks
-- Default exports for components (React convention)
-- Type exports using `export type` syntax
-- Constants exported as named exports
+- Named exports for components: `export function ThemedText(...)`
+- Named exports for hooks: `export function useGetPerson()`, `export function useSpeech(...)`
+- Named exports for utilities: `export async function getCachedSpeech(...)`, `export function cacheSpeech(...)`
+- Type exports: `export type ChatMessage = {...}`
+- Store exports: `export const useChatStore = create<ChatStore>(...)`
 
 **Barrel Files:**
-- Not used; imports always direct to source file
-- Example: `import { useChatStore } from '@/stores/chatStore'` (not from `@/stores`)
+- Not extensively used; most imports directly reference specific files
+- Hook files like `use-color-scheme.ts` re-export from React Native: `export { useColorScheme } from 'react-native'`
 
-**Store Pattern (Zustand):**
-- Create store with interface defining all state and setters
-- All mutations are action functions on the store
-- No thunks or middleware; direct state updates via `set()`
-- Example from `chatStore.ts`:
-  ```typescript
-  interface ChatStore {
-    messages: ChatMessage[];
-    addMessage: (msg: ChatMessage) => void;
-  }
-  
-  export const useChatStore = create<ChatStore>((set) => ({
-    messages: [],
-    addMessage: (msg) => set((s) => ({ messages: [...s.messages, msg] })),
-  }));
-  ```
+**File Organization:**
+- Stores/hooks: Single export per file (store or hook)
+- Types: Can contain multiple related type definitions (e.g., `avatar.ts` has `AvatarOption`, `AvatarVoiceOption`, `AvatarEvent`)
+- Utilities: Single or related utility functions per file (e.g., `speechCache.ts` exports cache operations)
+- Components: One component per file with StyleSheet at end
 
-## Async & Promises
+## Style Objects and Constants
 
-**Patterns:**
-- `async/await` for all async operations (preferred over `.then()`)
-- `useEffect` cleanup: cancel flag or ref to prevent stale updates
-  - Example: `let cancelled = false; return () => { cancelled = true; };`
-- React Query mutations (`useMutation`) for API calls with built-in loading/error states
-- Void return for fire-and-forget: `void run()` or `void prefetch()`
+**Styling Approach:**
+- React Native `StyleSheet.create()` for component styles (stored as `const styles`)
+- Inline style objects for animated/dynamic styles
+- Theme colors imported from `@/constants/theme`
+- Design tokens centralized in `theme.ts`: `Colors`, `Fonts`, `Spacing`, constants
 
-## State Management
-
-**Zustand Stores:**
-- Located in `src/stores/` directory (e.g., `chatStore.ts`, `avatarStore.ts`)
-- Immutable updates via spread operator: `{ messages: [...s.messages, msg] }`
-- Persistent state via MMKV integration: `mmkvStorage.setString('key', value)`
-- Used for UI state and conversation data
-
-**React Query (TanStack Query):**
-- `useMutation` for POST/write operations
-- Located in hooks (e.g., `useSendMessage.ts`, `useGetPerson.ts`)
-- Error handling via try-catch within `mutationFn`
-- Response parsing with fallback: `.catch(() => ({}))`
-
-**Local State:**
-- `useState` for component-local UI state (modals, selections, input fields)
-- `useRef` for non-rendering state (refs to WebView, cancel flags)
+**Constants in `theme.ts`:**
+```typescript
+export const Colors = { light: {...}, dark: {...} } as const;
+export const Fonts = Platform.select({...});
+export const Spacing = { half: 2, one: 4, ... } as const;
+```
 
 ---
 
