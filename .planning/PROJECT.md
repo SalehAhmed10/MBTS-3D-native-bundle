@@ -11,7 +11,7 @@
 
 BOTCIERGE Mobile is a React Native + Expo app that brings the BOTCIERGE AI concierge experience to Android and iOS. Users interact with a 3D talking avatar (powered by Three.js/TalkingHead rendered in a WebView) that responds to text input, detects intents, and performs tasks like shopping assistance, scheduling, auth flows, and general Q&A.
 
-The core differentiator: a photorealistic 3D avatar with lip-synced speech that runs **offline** on device via locally bundled assets — no CDN latency, no WebView cold-load, near-instant avatar response.
+The core differentiator: a photorealistic 3D avatar with lip-synced speech. Avatar assets (WebView bundle + GLBs) download once from a CDN on first launch and cache to local device storage — every launch after that is fully offline, no WebView cold-load, near-instant avatar response.
 
 The web version (MYBOTSTV) is the reference implementation. The mobile app must achieve visual and behavioral parity with it.
 
@@ -19,7 +19,7 @@ The web version (MYBOTSTV) is the reference implementation. The mobile app must 
 
 ## Core Value
 
-**The avatar must feel alive** — fast, smooth, lip-synced. Users tolerate a chatbot; they trust a person. Latency kills this.
+**The avatar must feel alive** — fast, smooth, lip-synced. Users tolerate a chatbot; they trust a person. Latency kills this. First launch pays a one-time download cost; every launch after is instant and offline.
 
 ---
 
@@ -34,8 +34,8 @@ B2C — general consumers who interact with Camille (the default AI concierge) a
 From codebase map + web version reference:
 
 - ✓ WebView + Three.js avatar rendering (TalkingHead library)
-- ✓ Android offline asset bundling (android-local-assets/ → APK native assets)
-- ✓ 2 avatars working on Android: Camille (Camilia.glb 2.7MB), Prithi (prithi.glb 8.6MB)
+- ✓ Cross-platform CDN bundle download + local cache (`src/services/avatarBundleManager.js`) — same code path on Android and iOS, no native asset bundling. Core bundle (~5MB: HTML/JS/manifest/backgrounds) downloads on first launch; each avatar's GLB downloads lazily on first selection with a progress UI; everything is cached to `FileSystem.documentDirectory` and served offline after that.
+- ✓ 4 avatars working: Camille, Prithi, Benjamin, John (Margie pending asset delivery)
 - ✓ TTS via Heroku backend (avatarSpeech/synthesize endpoint)
 - ✓ Chat message flow + intent detection via backend
 - ✓ User auth (login, identity verification)
@@ -49,16 +49,16 @@ From codebase map + web version reference:
 ## Active Requirements (v1 Mobile — Next Milestone)
 
 ### Avatar Expansion
-- [ ] **AV-01**: 5 avatars available on mobile: Camille, Prithi, Benjamin, John, Margie (with GLBs bundled)
-- [ ] **AV-02**: Avatar selection UI in app (user can switch avatar)
-- [ ] **AV-03**: Each avatar has correct camera settings (cameraY, cameraFOV, etc.) matching web version
-- [ ] **AV-04**: Each avatar has assigned TTS voice config
+- [~] **AV-01**: 5 avatars available on mobile: Camille, Prithi, Benjamin, John, Margie — 4/5 implemented (CDN download + cache, not bundled GLBs); Margie pending asset delivery; unverified on device
+- [~] **AV-02**: Avatar selection UI in app (user can switch avatar) — implemented, unverified on device
+- [~] **AV-03**: Each avatar has correct camera settings (cameraY, cameraFOV, etc.) matching web version — implemented via avatar-embed/avatars/manifest.json, unverified on device
+- [~] **AV-04**: Each avatar has assigned TTS voice config — implemented, unverified on device
 
 ### Background Selection
-- [ ] **BG-01**: Rich background gallery exposed in UI (cities, scenes — matching web version)
-- [ ] **BG-02**: User can select background from gallery before or during session
-- [ ] **BG-03**: Selected background persists to user profile (backend sync)
-- [ ] **BG-04**: Backgrounds bundled in android-local-assets (no CDN dependency)
+- [~] **BG-01**: Rich background gallery exposed in UI (cities, scenes — matching web version) — implemented, 14 options, unverified on device
+- [~] **BG-02**: User can select background from gallery before or during session — implemented, unverified on device
+- [ ] **BG-03**: Selected background persists to user profile (backend sync) — MMKV local persistence exists; backend sync not confirmed
+- [x] **BG-04**: Backgrounds downloaded as part of the CDN core bundle and served from local cache (no bundling into APK, no per-request CDN dependency after first launch)
 
 ### Performance & Smoothness
 - [ ] **PERF-01**: Avatar loads in <2s on mid-range Android (Pixel 4a class)
@@ -67,10 +67,10 @@ From codebase map + web version reference:
 - [ ] **PERF-04**: No dropped frames during avatar speech (60fps target)
 
 ### APK Size & Cleanup
-- [ ] **APK-01**: Remove Filament GLBs from assets/models/ (saves ~32MB): camilia.glb (23MB) + prithi.glb (8.6MB)
-- [ ] **APK-02**: Remove filament-preview.tsx and native-avatar-speech.tsx (dead code)
-- [ ] **APK-03**: Benjamin GLB (Benji.glb 31MB) — evaluate: bundle locally or serve remotely
-- [ ] **APK-04**: Total APK size budget: <100MB after all 5 avatars
+- [x] **APK-01**: Filament GLBs removed from assets/models/ (dir no longer exists)
+- [x] **APK-02**: filament-preview.tsx and native-avatar-speech.tsx removed; react-native-filament + react-native-worklets-core removed from package.json (2026-07-04)
+- [x] **APK-03**: Resolved — all avatars lazy-download their GLB via avatarBundleManager.js with a cache + progress UI; no bundle-vs-remote tradeoff remains
+- [~] **APK-04**: Reframed — avatar assets no longer ship in the APK at all (CDN download), so this is now about app code + native deps size, not avatar asset budget. Needs a fresh measurement.
 
 ### Production Hardening
 - [ ] **PROD-01**: Remove LogBox.ignoreAllLogs() from _layout.tsx
@@ -81,7 +81,7 @@ From codebase map + web version reference:
 
 ### iOS Foundation
 - [ ] **IOS-01**: Generate ios/ directory (expo prebuild --platform ios)
-- [ ] **IOS-02**: Bundle avatar assets for iOS (equivalent to android-local-assets/ strategy)
+- [~] **IOS-02**: Reframed — avatarBundleManager.js already uses a platform-agnostic download+cache path (`FileSystem.documentDirectory`), so this is likely satisfied by existing code once ios/ exists; needs simulator confirmation, not new implementation
 - [ ] **IOS-03**: Add iOS privacy manifest (required for App Store submission)
 - [ ] **IOS-04**: Test all 5 avatars on iOS simulator
 
@@ -104,21 +104,21 @@ From codebase map + web version reference:
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
 | WebView + Three.js renderer | Shares codebase with web version, easier 3D dev, proven at chatcamille.ai | Committed |
-| Android local asset bundling | Eliminates WebView cold-load latency, enables true offline | Committed |
-| Filament renderer removal | 32MB dead weight, WebView is production path | Pending removal |
+| ~~Android local asset bundling~~ → CDN download + local cache | Superseded 2026-06-16 (`7f890f4`): cross-platform parity (same code path Android/iOS) without APK bloat; solves the Benjamin GLB size problem for all avatars at once, not just one | Committed — supersedes the original bundling decision |
+| Filament renderer removal | 32MB dead weight, WebView is production path | Done (2026-07-04) — GLBs, dead components, and package.json deps all removed |
 | Camille as default avatar | Brand identity, client request | Done (2026-06-15) |
 | No EAS yet | Client hasn't signed off on store submission | Deferred |
-| Benjamin GLB size (31MB) | Decide: bundle vs remote serve | TBD in Avatar Expansion phase |
+| Benjamin GLB size (31MB) | Resolved via CDN download + cache (avatarBundleManager.js) — no longer bundle vs remote, always lazy-download+cache | Done (2026-06-16) |
 
 ---
 
 ## Technical Context
 
-- **Stack:** Expo SDK 52, RN 0.76, TypeScript, WebView (react-native-webview), Three.js/TalkingHead in avatar-embed/
+- **Stack:** Expo SDK 56, RN 0.85, React 19, TypeScript, WebView (react-native-webview), Three.js/TalkingHead in avatar-embed/, Zustand + React Query (new state layer, Redux retained only for untouched legacy screens)
 - **Avatar pipeline:** React Native → WebView (postMessage bridge) → Three.js TalkingHead → lip-sync audio
 - **Backend:** Heroku (shared with web version): auth, intents, TTS synthesis, user profiles
-- **Asset bundling:** android-local-assets/ → Gradle sourceSets → `file:///android_asset/avatar-web/`
-- **Build:** `scripts/build-avatar-embed.mjs` rebuilds the WebView bundle when avatar-embed/ changes
+- **Asset delivery:** `avatar-embed/` is the Vercel deployment root (`https://mbts-3-d-native-bundle.vercel.app/`). `src/services/avatarBundleManager.js` downloads the core bundle + backgrounds on first launch and each avatar GLB lazily on first selection, caching everything to `FileSystem.documentDirectory`. Same code path on Android and iOS — no native asset bundling step.
+- **Build:** `scripts/build-avatar-embed.mjs` rebuilds the WebView bundle when avatar-embed/ changes; deploy to Vercel to publish an update; bump `BUNDLE_VERSION` in avatarBundleManager.js to force clients to re-download
 
 ---
 
@@ -133,4 +133,4 @@ This document evolves at phase transitions and milestone boundaries.
 
 ---
 
-*Last updated: 2026-06-15 after brownfield initialization*
+*Last updated: 2026-07-04 after discovering and reconciling the CDN-download architecture pivot (commit 7f890f4) that superseded the original Android local-bundling plan*

@@ -20,9 +20,10 @@
 
 ### Phase 1: Avatar & Background Expansion
 
-**Goal:** Users can select any of 5 avatars and any background from a gallery, entirely offline on Android, with APK size under 100MB and dead Filament code removed.
+**Goal:** Users can select any of 5 avatars and any background from a gallery, offline after a one-time CDN download on first launch, with dead Filament code removed.
 **Depends on:** None
 **Complexity:** L
+**Note (2026-07-04):** Original goal assumed Android APK asset bundling. Superseded 2026-06-16 (`7f890f4`) by a cross-platform CDN-download-with-cache architecture (`avatarBundleManager.js`) — implemented but unverified on device. See PROJECT.md Key Decisions.
 
 ### Requirements
 
@@ -41,12 +42,12 @@
 
 ### Success Criteria
 
-1. A user can open the avatar picker and switch between all 5 avatars — each loads without error and speaks with its correct voice.
-2. A user can open the background gallery, select any scene, and see it applied immediately without a network request.
+1. A user can open the avatar picker and switch between all 5 avatars — each loads without error and speaks with its correct voice. (4/5 implemented — Margie pending asset; unverified on device)
+2. A user can open the background gallery, select any scene, and see it applied immediately without a network request — true after the one-time first-launch bundle download.
 3. The selected background is still active after closing and reopening the app.
-4. The release APK is verified under 100MB with no Filament GLBs or dead component files present.
+4. Filament GLBs and dead component files/deps are confirmed removed (done); APK size needs a fresh measurement now that avatar assets aren't bundled at all.
 
-**Plans:** TBD
+**Plans:** 3 written (01-Filament removal, 02-avatars, 03-backgrounds) — see `.planning/phases/01-avatar-background-expansion/`. Execution partially done outside tracked GSD state; needs verification pass before marking phase complete.
 
 ---
 
@@ -81,9 +82,9 @@
 
 ### Phase 3: iOS Foundation
 
-**Goal:** The app compiles, launches, and runs all 5 avatars on an iOS simulator with assets served locally — no network dependency for avatar rendering.
+**Goal:** The app compiles, launches, and runs all 5 avatars on an iOS simulator with assets served locally — no network dependency for avatar rendering (after first launch).
 **Depends on:** Phase 2
-**Complexity:** M
+**Complexity:** M (likely smaller than originally scoped — the CDN-download architecture is already platform-agnostic; IOS-02 may be mostly satisfied by existing code, see REQUIREMENTS.md)
 
 ### Requirements
 
@@ -106,6 +107,6 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Avatar & Background Expansion | 0/0 | Not started | — |
+| 1. Avatar & Background Expansion | 1/3 (plan 03 has a completion summary; plans 01-02 executed but untracked) | Partially executed, unverified | — |
 | 2. Performance, Polish & Production Hardening | 0/0 | Not started | — |
 | 3. iOS Foundation | 0/0 | Not started | — |

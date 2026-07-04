@@ -1,8 +1,8 @@
 # BOTCIERGE Mobile — Requirements
 
 **Version:** v1 Mobile Milestone
-**Last updated:** 2026-06-15
-**Status:** Ready for roadmap
+**Last updated:** 2026-07-04 — reconciled with CDN-download architecture pivot (commit `7f890f4`, 2026-06-16) discovered during Phase 1 discussion
+**Status:** Phase 1 partially implemented (unverified on device), Phase 2/3 not started
 
 ---
 
@@ -17,10 +17,10 @@
 
 ### Background Selection (BG)
 
-- [ ] **BG-01** — User can browse and select from a gallery of backgrounds (minimum 8 scenes matching web version)
-- [ ] **BG-02** — Selected background applies immediately in the avatar view
-- [ ] **BG-03** — Background selection persists to user profile (survives app restart)
-- [ ] **BG-04** — All backgrounds bundled in android-local-assets (no CDN dependency on Android)
+- [~] **BG-01** — User can browse and select from a gallery of backgrounds (minimum 8 scenes matching web version) — implemented (14 options), unverified on device
+- [~] **BG-02** — Selected background applies immediately in the avatar view — implemented, unverified on device
+- [ ] **BG-03** — Background selection persists to user profile (survives app restart) — MMKV local persistence only; backend/profile sync not implemented
+- [x] **BG-04** — Backgrounds ship as part of the CDN core bundle (downloaded on first launch, cached locally) instead of Android APK bundling — no CDN dependency after first launch, works identically on iOS
 
 ### Performance (PERF)
 
@@ -31,10 +31,10 @@
 
 ### APK Cleanup (APK)
 
-- [ ] **APK-01** — Remove assets/models/camilia.glb (23MB) and assets/models/prithi.glb (8.6MB) — Filament dead code
-- [ ] **APK-02** — Remove src/components/filament-preview.tsx and src/components/native-avatar-speech.tsx
-- [ ] **APK-03** — Benjamin avatar GLB size decision: bundle or lazy-load (31MB Benji.glb is too large to bundle naively)
-- [ ] **APK-04** — Final APK size under 100MB (Google Play limit for direct download without streaming delivery)
+- [x] **APK-01** — assets/models/camilia.glb and assets/models/prithi.glb removed (Filament dead code) — directory no longer exists
+- [x] **APK-02** — src/components/filament-preview.tsx, native-avatar-speech.tsx removed; react-native-filament + react-native-worklets-core removed from package.json (2026-07-04)
+- [x] **APK-03** — Resolved: all avatar GLBs lazy-download via avatarBundleManager.js with local cache + progress UI — no bundle-vs-lazy-load tradeoff remains, applies uniformly to all 5 avatars
+- [~] **APK-04** — Reframed: avatar assets no longer count toward APK size at all (downloaded post-install). Requirement is now "app binary size stays reasonable" — needs a fresh build + measurement, not an asset budget decision
 
 ### Production Hardening (PROD)
 
@@ -47,7 +47,7 @@
 ### iOS Foundation (IOS)
 
 - [ ] **IOS-01** — ios/ directory generated via expo prebuild; app compiles and runs on iOS simulator
-- [ ] **IOS-02** — Avatar assets bundled for iOS (index.html + GLBs accessible at runtime without network)
+- [~] **IOS-02** — Reframed: avatarBundleManager.js already uses a platform-agnostic download+cache path (FileSystem.documentDirectory works the same on iOS) — likely satisfied by existing code once ios/ exists, needs simulator confirmation rather than new implementation
 - [ ] **IOS-03** — iOS privacy manifest file added (NSPrivacyAccessedAPITypes, required since spring 2024)
 - [ ] **IOS-04** — All 5 avatars verified on iOS simulator (no render/GL errors)
 
@@ -80,28 +80,28 @@
 
 | REQ-ID | Description | Phase | Status |
 |--------|-------------|-------|--------|
-| AV-01 | 5 avatars selectable: Camille, Prithi, Benjamin, John, Margie | Phase 1: Avatar & Background Expansion | Unplanned |
-| AV-02 | Avatar selection UI accessible in-app | Phase 1: Avatar & Background Expansion | Unplanned |
-| AV-03 | Each avatar loads with correct camera settings | Phase 1: Avatar & Background Expansion | Unplanned |
-| AV-04 | Each avatar assigned correct TTS voice | Phase 1: Avatar & Background Expansion | Unplanned |
-| BG-01 | Background gallery with 8+ scenes | Phase 1: Avatar & Background Expansion | Unplanned |
-| BG-02 | Selected background applies immediately | Phase 1: Avatar & Background Expansion | Unplanned |
-| BG-03 | Background selection persists to user profile | Phase 1: Avatar & Background Expansion | Unplanned |
-| BG-04 | Backgrounds bundled in android-local-assets | Phase 1: Avatar & Background Expansion | Unplanned |
-| APK-01 | Remove Filament GLBs from assets/models/ | Phase 1: Avatar & Background Expansion | Unplanned |
-| APK-02 | Remove dead Filament component files | Phase 1: Avatar & Background Expansion | Unplanned |
-| APK-03 | Benjamin GLB bundle-vs-lazy-load decision | Phase 1: Avatar & Background Expansion | Unplanned |
-| APK-04 | Final APK under 100MB | Phase 1: Avatar & Background Expansion | Unplanned |
+| AV-01 | 5 avatars selectable: Camille, Prithi, Benjamin, John, Margie | Phase 1: Avatar & Background Expansion | Implemented (4/5), unverified |
+| AV-02 | Avatar selection UI accessible in-app | Phase 1: Avatar & Background Expansion | Implemented, unverified |
+| AV-03 | Each avatar loads with correct camera settings | Phase 1: Avatar & Background Expansion | Implemented, unverified |
+| AV-04 | Each avatar assigned correct TTS voice | Phase 1: Avatar & Background Expansion | Implemented, unverified |
+| BG-01 | Background gallery with 8+ scenes | Phase 1: Avatar & Background Expansion | Implemented, unverified |
+| BG-02 | Selected background applies immediately | Phase 1: Avatar & Background Expansion | Implemented, unverified |
+| BG-03 | Background selection persists to user profile | Phase 1: Avatar & Background Expansion | Partial (local only, no backend sync) |
+| BG-04 | Backgrounds delivered via CDN bundle + cache | Phase 1: Avatar & Background Expansion | Done |
+| APK-01 | Remove Filament GLBs from assets/models/ | Phase 1: Avatar & Background Expansion | Done |
+| APK-02 | Remove dead Filament component files + deps | Phase 1: Avatar & Background Expansion | Done |
+| APK-03 | Benjamin GLB bundle-vs-lazy-load decision | Phase 1: Avatar & Background Expansion | Done — resolved via CDN download+cache |
+| APK-04 | Final APK under 100MB | Phase 1: Avatar & Background Expansion | Reframed — needs fresh measurement |
 | PERF-01 | Avatar loads in <2s on mid-range Android | Phase 2: Performance, Polish & Production Hardening | Unplanned |
 | PERF-02 | WebView pre-warmed on app start | Phase 2: Performance, Polish & Production Hardening | Unplanned |
 | PERF-03 | TTS response: message to speech start <1.5s | Phase 2: Performance, Polish & Production Hardening | Unplanned |
 | PERF-04 | No frame drops during avatar speech | Phase 2: Performance, Polish & Production Hardening | Unplanned |
-| PROD-01 | Remove LogBox.ignoreAllLogs() | Phase 2: Performance, Polish & Production Hardening | Unplanned |
+| PROD-01 | Remove LogBox.ignoreAllLogs() | Phase 2: Performance, Polish & Production Hardening | Not done — still present in src/app/_layout.tsx |
 | PROD-02 | Prod config throws if API URL env var missing | Phase 2: Performance, Polish & Production Hardening | Unplanned |
-| PROD-03 | allowUniversalAccessFromFileURLs scoped correctly | Phase 2: Performance, Polish & Production Hardening | Unplanned |
+| PROD-03 | allowUniversalAccessFromFileURLs scoped correctly | Phase 2: Performance, Polish & Production Hardening | Not done — still unconditionally true in AvatarWebView.js |
 | PROD-04 | Error boundary on avatar screen | Phase 2: Performance, Polish & Production Hardening | Unplanned |
 | PROD-05 | Sentry crash reporting integrated | Phase 2: Performance, Polish & Production Hardening | Unplanned |
 | IOS-01 | ios/ dir generated; app runs on simulator | Phase 3: iOS Foundation | Unplanned |
-| IOS-02 | Avatar assets bundled for iOS (no network) | Phase 3: iOS Foundation | Unplanned |
+| IOS-02 | Avatar assets bundled for iOS (no network) | Phase 3: iOS Foundation | Likely satisfied by existing avatarBundleManager.js — needs simulator confirmation |
 | IOS-03 | iOS privacy manifest added | Phase 3: iOS Foundation | Unplanned |
 | IOS-04 | All 5 avatars verified on iOS simulator | Phase 3: iOS Foundation | Unplanned |
