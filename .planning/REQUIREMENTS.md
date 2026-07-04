@@ -2,7 +2,7 @@
 
 **Version:** v1 Mobile Milestone
 **Last updated:** 2026-07-04 — reconciled with CDN-download architecture pivot (commit `7f890f4`, 2026-06-16) discovered during Phase 1 discussion
-**Status:** Phase 1 partially implemented (unverified on device), Phase 2/3 not started
+**Status:** Phase 1 avatar/background work confirmed on device (2026-07-04); Phase 1 PROD items + Phase 2/3 not started
 
 ---
 
@@ -10,16 +10,16 @@
 
 ### Avatar Expansion (AV)
 
-- [ ] **AV-01** — User can choose from 5 avatars: Camille, Prithi, Benjamin, John, Margie
-- [ ] **AV-02** — Avatar selection UI accessible in-app (before or during session)
-- [ ] **AV-03** — Each avatar loads with correct camera settings matching web version (cameraY, cameraFOV, cameraRotate*)
-- [ ] **AV-04** — Each avatar has assigned TTS voice: Camille→af_bella, Prithi→ef_dora, Benjamin→am_fenrir, John→am_fenrir, Margie→af_bella
+- [x] **AV-01** — User can choose from 5 avatars: Camille, Prithi, Benjamin, John, Margie — 4/5 confirmed on device 2026-07-04; Margie pending asset delivery
+- [x] **AV-02** — Avatar selection UI accessible in-app (before or during session) — confirmed on device 2026-07-04
+- [x] **AV-03** — Each avatar loads with correct camera settings matching web version (cameraY, cameraFOV, cameraRotate*) — confirmed on device 2026-07-04; mobile-specific FOV values kept deliberately (see 01-02-SUMMARY.md)
+- [~] **AV-04** — Each avatar has assigned TTS voice: Camille→af_bella, Prithi→ef_dora, Benjamin→am_fenrir, John→am_fenrir, Margie→af_bella — voice *assignment* confirmed correct in UI; audio *output* not verified (chat-send round-trip not completed via adb automation)
 
 ### Background Selection (BG)
 
-- [~] **BG-01** — User can browse and select from a gallery of backgrounds (minimum 8 scenes matching web version) — implemented (14 options), unverified on device
-- [~] **BG-02** — Selected background applies immediately in the avatar view — implemented, unverified on device
-- [ ] **BG-03** — Background selection persists to user profile (survives app restart) — MMKV local persistence only; backend/profile sync not implemented
+- [x] **BG-01** — User can browse and select from a gallery of backgrounds (minimum 8 scenes matching web version) — confirmed on device 2026-07-04 (14 options, Cities/Scenes categories render correctly)
+- [x] **BG-02** — Selected background applies immediately in the avatar view — confirmed on device 2026-07-04 (New York applied instantly, no network request)
+- [~] **BG-03** — Background selection persists to user profile (survives app restart) — local MMKV persistence confirmed on device 2026-07-04 (survives force-stop + relaunch); backend/profile sync not implemented
 - [x] **BG-04** — Backgrounds ship as part of the CDN core bundle (downloaded on first launch, cached locally) instead of Android APK bundling — no CDN dependency after first launch, works identically on iOS
 
 ### Performance (PERF)
@@ -80,13 +80,13 @@
 
 | REQ-ID | Description | Phase | Status |
 |--------|-------------|-------|--------|
-| AV-01 | 5 avatars selectable: Camille, Prithi, Benjamin, John, Margie | Phase 1: Avatar & Background Expansion | Implemented (4/5), unverified |
-| AV-02 | Avatar selection UI accessible in-app | Phase 1: Avatar & Background Expansion | Implemented, unverified |
-| AV-03 | Each avatar loads with correct camera settings | Phase 1: Avatar & Background Expansion | Implemented, unverified |
-| AV-04 | Each avatar assigned correct TTS voice | Phase 1: Avatar & Background Expansion | Implemented, unverified |
-| BG-01 | Background gallery with 8+ scenes | Phase 1: Avatar & Background Expansion | Implemented, unverified |
-| BG-02 | Selected background applies immediately | Phase 1: Avatar & Background Expansion | Implemented, unverified |
-| BG-03 | Background selection persists to user profile | Phase 1: Avatar & Background Expansion | Partial (local only, no backend sync) |
+| AV-01 | 5 avatars selectable: Camille, Prithi, Benjamin, John, Margie | Phase 1: Avatar & Background Expansion | Confirmed on device (4/5) |
+| AV-02 | Avatar selection UI accessible in-app | Phase 1: Avatar & Background Expansion | Confirmed on device |
+| AV-03 | Each avatar loads with correct camera settings | Phase 1: Avatar & Background Expansion | Confirmed on device |
+| AV-04 | Each avatar assigned correct TTS voice | Phase 1: Avatar & Background Expansion | Assignment confirmed; audio playback unverified |
+| BG-01 | Background gallery with 8+ scenes | Phase 1: Avatar & Background Expansion | Confirmed on device |
+| BG-02 | Selected background applies immediately | Phase 1: Avatar & Background Expansion | Confirmed on device |
+| BG-03 | Background selection persists to user profile | Phase 1: Avatar & Background Expansion | Local persistence confirmed on device; no backend sync |
 | BG-04 | Backgrounds delivered via CDN bundle + cache | Phase 1: Avatar & Background Expansion | Done |
 | APK-01 | Remove Filament GLBs from assets/models/ | Phase 1: Avatar & Background Expansion | Done |
 | APK-02 | Remove dead Filament component files + deps | Phase 1: Avatar & Background Expansion | Done |

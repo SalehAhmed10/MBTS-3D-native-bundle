@@ -1,7 +1,7 @@
 # BOTCIERGE Mobile — Project State
 
 **Project:** BOTCIERGE Mobile
-**Status:** Planning (Phase 1 partially executed outside tracked state — see below)
+**Status:** Planning (Phase 1 avatar/background work confirmed on device; PROD items remain)
 **Last Activity:** 2026-07-04
 
 ---
@@ -10,16 +10,16 @@
 
 | Phase | Name | Status | Plans | Notes |
 |-------|------|--------|-------|-------|
-| 1 | Avatar & Background Expansion | Partially executed, unverified | 3 (01, 02, 03 written; only 03 has a completion summary) | Discovered 2026-07-04: plans 01/02 were executed on disk (avatars + Filament removal) but never logged here. Needs device verification before marking complete. |
-| 2 | Performance, Polish & Production Hardening | Unplanned | 0 | — |
+| 1 | Avatar & Background Expansion | Avatars/backgrounds confirmed on device; APK cleanup done; PROD items open | 3 (01, 02, 03 all have completion summaries) | Device-verified 2026-07-04 on TECNO KL7: 4/5 avatars, background gallery + persistence all work. TTS audio playback and PROD-01/03 fixes still open. |
+| 2 | Performance, Polish & Production Hardening | Unplanned | 0 | PROD-01 (LogBox) and PROD-03 (allowUniversalAccessFromFileURLs) already known open items from Phase 1 review |
 | 3 | iOS Foundation | Unplanned | 0 | Depends on Phase 2. Likely smaller than scoped — CDN download architecture is already cross-platform. |
 
 ---
 
 ## Current Focus
 
-**Phase:** 1 — Avatar & Background Expansion (context gathering / replan in progress)
-**Plan:** Reconciling docs with actual implementation before continuing discuss-phase
+**Phase:** 1 — Avatar & Background Expansion (device verification done, deciding whether to formally close the phase or address PROD-01/03 first)
+**Plan:** —
 **Blocker:** None
 
 ---
@@ -44,7 +44,7 @@
 - Margie avatar GLB not yet confirmed delivered — implement when asset arrives
 - allowUniversalAccessFromFileURLs is still enabled unconditionally in AvatarWebView.js (security debt — PROD-03, not yet fixed)
 - LogBox.ignoreAllLogs() still present in src/app/_layout.tsx and masks real errors in dev (PROD-01, not yet fixed)
-- None of Phase 1's on-device work has been verified — plans 01/02 executed without a summary or device confirmation
+- TTS audio playback (voice correctness) not verified — chat-send flow wasn't exercised end-to-end during the 2026-07-04 device pass (soft-keyboard text entry via adb was unreliable)
 
 ### Asset Inventory (as of 2026-07-04)
 - `avatar-embed/`: Vercel deployment source (Camilia.glb, prithi.glb, Benji.glb, john.glb, manifest.json, 14 background images) — served at `https://mbts-3-d-native-bundle.vercel.app/`
@@ -54,11 +54,12 @@
 - John + Benjamin GLBs confirmed present in avatar-embed/; Margie GLB still not delivered
 
 ### Todos
-- Verify Phase 1 work on a real device/emulator: avatar switching (5 → 4 available), background gallery, first-launch download flow
+- Verify TTS audio playback (voice correctness) end-to-end — not completed 2026-07-04, needs manual chat-send test with actual listening
 - Confirm Margie GLB delivery timeline with client
 - Client to provide production backend URL (Heroku staging stays for now)
 - Fix PROD-01 (LogBox.ignoreAllLogs) and PROD-03 (allowUniversalAccessFromFileURLs) — both still open, scoped to Phase 2
 - Re-measure APK size now that avatar assets are CDN-delivered, not bundled
+- Argent MCP tap/screenshot tools don't work on this Windows+Android setup (missing simulator-server binary for win32) — device verification had to fall back to raw adb; worth noting for future sessions
 
 ---
 

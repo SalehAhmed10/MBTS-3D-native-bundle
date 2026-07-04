@@ -42,12 +42,12 @@
 
 ### Success Criteria
 
-1. A user can open the avatar picker and switch between all 5 avatars — each loads without error and speaks with its correct voice. (4/5 implemented — Margie pending asset; unverified on device)
-2. A user can open the background gallery, select any scene, and see it applied immediately without a network request — true after the one-time first-launch bundle download.
-3. The selected background is still active after closing and reopening the app.
+1. A user can open the avatar picker and switch between all 5 avatars — each loads without error and speaks with its correct voice. Confirmed on device 2026-07-04 for 4/5 (Margie pending asset); voice *assignment* confirmed, audio *playback* still unverified.
+2. A user can open the background gallery, select any scene, and see it applied immediately without a network request — confirmed on device 2026-07-04 (true after the one-time first-launch bundle download).
+3. The selected background is still active after closing and reopening the app — confirmed on device 2026-07-04 (force-stop + relaunch, background persisted via MMKV).
 4. Filament GLBs and dead component files/deps are confirmed removed (done); APK size needs a fresh measurement now that avatar assets aren't bundled at all.
 
-**Plans:** 3 written (01-Filament removal, 02-avatars, 03-backgrounds) — see `.planning/phases/01-avatar-background-expansion/`. Execution partially done outside tracked GSD state; needs verification pass before marking phase complete.
+**Plans:** 3 written (01-Filament removal, 02-avatars, 03-backgrounds) — all 3 now have completion summaries, all device-verified 2026-07-04 except TTS audio playback. See `.planning/phases/01-avatar-background-expansion/`.
 
 ---
 
@@ -107,6 +107,6 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Avatar & Background Expansion | 1/3 (plan 03 has a completion summary; plans 01-02 executed but untracked) | Partially executed, unverified | — |
+| 1. Avatar & Background Expansion | 3/3 (all have completion summaries, device-verified 2026-07-04) | Avatars/backgrounds done; PROD-01/03 open, scoped to Phase 2 | — |
 | 2. Performance, Polish & Production Hardening | 0/0 | Not started | — |
 | 3. iOS Foundation | 0/0 | Not started | — |

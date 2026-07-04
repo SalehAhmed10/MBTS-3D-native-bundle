@@ -48,4 +48,8 @@ Used `react-native-mmkv-storage` (v12.0.1) synchronous API — `mmkvStorage.getS
 
 ## Device Test
 
-Pending — requires `npm run android` and manual verification on device.
+Confirmed 2026-07-04 on physical device (TECNO KL7, serial 13018374C5000162):
+- Cities category showed New York, Dubai, Hong Kong, Beijing thumbnails rendering correctly (one earlier screenshot caught them mid-load — false alarm, not a bug)
+- Selecting New York applied the background immediately, visible behind the avatar/settings modal with no network request
+- Force-stopped and relaunched the app: New York background persisted correctly via MMKV (survives restart)
+- Avatar selection (John, selected before restart) did NOT persist — reverts to default Camille. This matches source code (`avatarStore.ts` only persists `selectedBackgroundId`, not `selectedAvatarId`) and no requirement (AV-01..04) mandates avatar-selection persistence, so this is expected behavior, not a gap.
