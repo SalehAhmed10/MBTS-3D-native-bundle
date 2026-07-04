@@ -2,6 +2,7 @@
   "name": "mbts-3d-native-spike",
   "main": "expo-router/entry",
   "version": "1.0.0",
+  
   "dependencies": {
     "@expo/ui": "~56.0.14",
     "@react-native-community/datetimepicker": "^9.1.0",
@@ -11,6 +12,7 @@
     "@reduxjs/toolkit": "^2.12.0",
     "@rneui/base": "^5.0.0",
     "@rneui/themed": "^5.0.0",
+    "@tanstack/react-query": "^5.101.0",
     "axios": "^1.16.1",
     "date-fns": "^4.3.0",
     "expo": "~56.0.8",
@@ -53,7 +55,8 @@
     "react-redux": "^9.3.0",
     "redux": "^5.0.1",
     "redux-persist": "^6.0.0",
-    "redux-thunk": "^3.1.0"
+    "redux-thunk": "^3.1.0",
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@gltf-transform/cli": "^4.3.0",
@@ -70,6 +73,7 @@
   },
   "scripts": {
     "start": "expo start",
+    "android:clean": "npx expo run:android --no-build-cache",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo run:android",
     "ios": "expo run:ios",

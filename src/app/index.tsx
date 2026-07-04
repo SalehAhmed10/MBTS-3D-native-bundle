@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef } from "react";
 import {
   Image,
   ImageBackground,
@@ -17,10 +17,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { StatusBar } from "expo-status-bar";
 import AvatarWebView from "@/components/avatar/AvatarWebView";
-import { SPEECH_SYNTHESIS_ENDPOINT } from "@/config";
-import { mmkvStorage } from "@/redux/storage/storage";
-import { baseURL } from "@/utils/api";
-import { cacheSpeech, getCachedSpeech } from "@/utils/speechCache";
+import { useAvatarStore } from "@/stores/avatarStore";
+import { useChatStore } from "@/stores/chatStore";
+import { useSendMessage } from "@/hooks/useSendMessage";
+import { useAuthFlow } from "@/hooks/useAuthFlow";
+import { useSpeech } from "@/hooks/useSpeech";
 
 type AvatarVoiceOption = {
   id: string;
@@ -150,13 +151,6 @@ type CandidateUser = {
   };
 };
 
-type IntentResponse = {
-  type?: string;
-  message?: string;
-  data?: CandidateUser[];
-  newMessage?: string;
-};
-
 type ChatApiResponse = {
   reply?: string;
   emotion?: string;
@@ -169,12 +163,6 @@ type ChatApiResponse = {
 type ConversationTurn = {
   role: 'user' | 'assistant';
   content: string;
-};
-
-type PersonResponse = {
-  status?: string;
-  type?: string;
-  data?: CandidateUser;
 };
 
 const AUTH_PROPERTIES: AuthProperty[] = [
@@ -214,49 +202,46 @@ export default function HomeScreen() {
     setMood: (mood: string) => void;
     speakAudio: (payload: Record<string, unknown>) => void;
   } | null>(null);
-  const lastDispatchedSpeechIdRef = useRef<string | null>(null);
-  const [isSelectorOpen, setIsSelectorOpen] = useState(false);
-  const [avatarOptions, setAvatarOptions] = useState<AvatarOption[]>(DEFAULT_AVATAR_OPTIONS);
-  const [selectedAvatarId, setSelectedAvatarId] = useState<string>(DEFAULT_AVATAR_ID);
-  const [selectedVoiceId, setSelectedVoiceId] = useState<string | null>(
-    DEFAULT_AVATAR_OPTIONS[0]?.defaultVoiceId || DEFAULT_AVATAR_OPTIONS[0]?.voice?.id || null
-  );
-  const [selectedEmotionId, setSelectedEmotionId] = useState<(typeof EMOTION_OPTIONS)[number]["id"]>("happy");
-  const [selectedBackgroundId, setSelectedBackgroundId] = useState<string>(() => {
-    const persisted = mmkvStorage.getString('selectedBackgroundId');
-    // bg1-5.jpg are not in the CDN bundle — migrate stale persisted values to Munich.
-    const CDN_BACKGROUNDS = new Set(['none', 'bg_beijing.jpg', 'bg_dubai.jpg', 'bg_glasgow.jpg', 'bg_hongkong.jpg', 'bg_honolulu.jpg', 'bg_munich.jpg', 'bg_nyc2.jpg', 'bg_spaceship.jpg']);
-    return (persisted && CDN_BACKGROUNDS.has(persisted)) ? persisted : 'bg_munich.jpg';
-  });
-  const [activeBgCategory, setActiveBgCategory] = useState<"scenes" | "cities" | null>(null);
-  const [input, setInput] = useState("");
-  const [isReplying, setIsReplying] = useState(false);
-  const [chatStep, setChatStep] = useState<"name" | "intent" | "auth">("name");
-  const [guestName, setGuestName] = useState("");
-  const [authenticated, setAuthenticated] = useState(false);
-  const [person, setPerson] = useState<CandidateUser | null>(null);
-  const [users, setUsers] = useState<CandidateUser[]>([]);
-  const [authProperties, setAuthProperties] = useState<AuthProperty[]>(AUTH_PROPERTIES);
-  const [currentAuthProp, setCurrentAuthProp] = useState<AuthProperty | null>(null);
-  const [conversationHistory, setConversationHistory] = useState<ConversationTurn[]>([
-    { role: 'assistant', content: buildHelloMessage("Camille") },
-  ]);
-  const [srxState, setSrxState] = useState<unknown>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: "hello",
-      message: buildHelloMessage("Camille"),
-      me: false,
-    },
-  ]);
-  const [speechQueue, setSpeechQueue] = useState<SpeechQueueItem[]>([
-    {
-      id: "hello",
-      text: buildHelloMessage("Camille"),
-    },
-  ]);
+  const {
+    avatarOptions,
+    selectedAvatarId,
+    selectedVoiceId,
+    selectedEmotionId,
+    selectedBackgroundId,
+    activeBgCategory,
+    isSelectorOpen,
+    setAvatarOptions,
+    setSelectedAvatarId,
+    setSelectedVoiceId,
+    setSelectedEmotionId,
+    setSelectedBackgroundId,
+    setActiveBgCategory,
+    setIsSelectorOpen,
+  } = useAvatarStore();
+
+  const {
+    messages,
+    speechQueue,
+    input,
+    isReplying,
+    srxState,
+    addMessage,
+    addSpeechItem,
+    advanceSpeechQueue,
+    setInput,
+    setIsReplying,
+    setSrxState,
+    setUsers,
+    setAuthProperties: setChatStoreAuthProperties,
+    setCurrentAuthProp: setChatStoreCurrentAuthProp,
+    setChatStep,
+  } = useChatStore();
+
+  const { mutateAsync: sendChatMutate } = useSendMessage();
   const selectedAvatar =
     avatarOptions.find((avatarOption) => avatarOption.id === selectedAvatarId) || avatarOptions[0] || DEFAULT_AVATAR_OPTIONS[0];
+  const greeting = buildHelloMessage(selectedAvatar.label);
+  const displayMessages: ChatMessage[] = [{ id: 'hello', message: greeting, me: false }, ...messages];
   const selectedVoiceOptions =
     (selectedAvatar?.voices && selectedAvatar.voices.length > 0 ? selectedAvatar.voices : selectedAvatar?.voice ? [selectedAvatar.voice] : []) ||
     [];
@@ -269,32 +254,13 @@ export default function HomeScreen() {
     BACKGROUND_OPTIONS.find((backgroundOption) => backgroundOption.id === selectedBackgroundId) ||
     BACKGROUND_OPTIONS[0];
   const selectedBackgroundSource = selectedBackground.source as ImageSourcePropType | undefined;
-  const activeSpeech = speechQueue[0] ?? null;
 
-  const addAvatarMessage = (message: string) => {
-    const messageId = `${Date.now()}-avatar`;
-    const normalizedMessage = normalizeAvatarMessage(message);
-
-    setMessages((currentMessages) => [
-      ...currentMessages,
-      {
-        id: messageId,
-        message: normalizedMessage,
-        me: false,
-      },
-    ]);
-    setSpeechQueue((currentQueue) => [
-      ...currentQueue,
-      {
-        id: messageId,
-        text: normalizedMessage,
-      },
-    ]);
-  };
-
-  const advanceSpeechQueue = useCallback(() => {
-    setSpeechQueue((currentQueue) => currentQueue.slice(1));
-  }, []);
+  const addAvatarMessage = useCallback((message: string) => {
+    const id = `${Date.now()}-avatar`;
+    const normalized = normalizeAvatarMessage(message);
+    addMessage({ id, message: normalized, me: false });
+    addSpeechItem({ id, text: normalized });
+  }, [addMessage, addSpeechItem]);
 
   const hydrateAvatarOptions = useCallback((supportedAvatars?: AvatarRuntimeDescriptor[]) => {
     if (!Array.isArray(supportedAvatars) || supportedAvatars.length === 0) {
@@ -330,456 +296,107 @@ export default function HomeScreen() {
     }
 
     setAvatarOptions(nextAvatarOptions);
-    setSelectedAvatarId((currentAvatarId) =>
-      nextAvatarOptions.some((avatarOption) => avatarOption.id === currentAvatarId)
-        ? currentAvatarId
+    setSelectedAvatarId(
+      nextAvatarOptions.some((o) => o.id === selectedAvatarId)
+        ? selectedAvatarId
         : nextAvatarOptions[0].id
     );
-  }, []);
+  }, [selectedAvatarId, setAvatarOptions, setSelectedAvatarId]);
 
   const handleAvatarEvent = useCallback(
     (event?: AvatarEvent) => {
       if (event?.type === "avatar_ready") {
         hydrateAvatarOptions(event.supportedAvatars);
+        // Speak greeting once WebView is ready. Queue was empty at mount — this is the trigger.
+        const helloText = buildHelloMessage(
+          (event.supportedAvatars?.find((a) => a.id === selectedAvatarId)?.label) ??
+          DEFAULT_AVATAR_OPTIONS[0].label
+        );
+        addSpeechItem({ id: 'hello', text: helloText });
       }
 
       if (event?.type === "speech_finished" || event?.type === "avatar_error") {
         advanceSpeechQueue();
       }
     },
-    [advanceSpeechQueue, hydrateAvatarOptions]
+    [advanceSpeechQueue, hydrateAvatarOptions, addSpeechItem, selectedAvatarId]
   );
 
-  const authenticationMessage = (property: AuthProperty) => {
-    if (property === "favoriteColor") {
-      return "What's your favorite color?";
-    }
+  const { chatStep, guestName, person, authenticated, handleAuthMessage, handleNameMessage, resetAuthChallenge } =
+    useAuthFlow(addAvatarMessage);
 
-    if (property === "homeCountry") {
-      return "What's your home country?";
-    }
+  useSpeech({ avatarWebViewRef, selectedAvatar, selectedEmotionId, selectedVoice });
 
-    if (property === "homeState") {
-      return "What's your home state?";
-    }
-
-    return "What's your mother's maiden name?";
+  const handleSelectEmotion = (id: string) => {
+    setSelectedEmotionId(id);
+    avatarWebViewRef.current?.setMood(id);
   };
 
-  const getLimit = (property: AuthProperty) => (property === "mothersMaidenName" ? 50 : 30);
-
-  const resetAuthChallenge = () => {
-    setAuthProperties(AUTH_PROPERTIES);
-    setCurrentAuthProp(null);
-    setUsers([]);
-    setChatStep("intent");
-  };
-
-  const verifyPerson = async (user: CandidateUser) => {
-    const response = await fetch(`${baseURL}users/getPersonById`, {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ user: { _id: user._id } }),
-    });
-
-    const responseJson = (await response.json().catch(() => ({}))) as PersonResponse;
-
-    if (!response.ok || responseJson.type !== "person" || responseJson.status !== "OK" || !responseJson.data) {
-      throw new Error(AUTH_FAILURE_PROMPT);
-    }
-
-    const verifiedPerson = {
-      ...responseJson.data,
-      _id: user._id,
-    };
-
-    setAuthenticated(true);
-    setPerson(verifiedPerson);
-    resetAuthChallenge();
-    addAvatarMessage("I have successfully verified your identity. How may I assist you?");
-
-    if (verifiedPerson.user?.avatarName && verifiedPerson.user.avatarName !== "Camilia") {
-      addAvatarMessage(`I see you've chosen ${verifiedPerson.user.avatarName} to be your host`);
-      addAvatarMessage(`Bye ${guestName}. ${verifiedPerson.user.avatarName} will take care of you from here :)`);
-    }
-  };
-
-  const askNextAuthQuestion = async (candidateUsers: CandidateUser[], remainingProperties: AuthProperty[]) => {
-    if (candidateUsers.length === 0) {
-      addAvatarMessage(AUTH_FAILURE_PROMPT);
-      resetAuthChallenge();
-      return;
-    }
-
-    if (remainingProperties.length === 0 || candidateUsers.length === 1) {
-      await verifyPerson(candidateUsers[0]);
-      return;
-    }
-
-    const [nextProperty, ...nextRemainingProperties] = remainingProperties;
-    setCurrentAuthProp(nextProperty);
-    setAuthProperties(nextRemainingProperties);
-    addAvatarMessage(authenticationMessage(nextProperty));
-  };
-
-  const handleAuthMessage = async (nextMessage: string) => {
-    if (authProperties.length === AUTH_PROPERTIES.length && !currentAuthProp) {
-      if (nextMessage.length > 20) {
-        addAvatarMessage("I don't understand. Please be more concise.");
-        return;
-      }
-
-      if (nextMessage.toLowerCase().includes("yes")) {
-        await askNextAuthQuestion(users, authProperties);
-        return;
-      }
-
-      if (nextMessage.toLowerCase().includes("no")) {
-        const firstUser = users[0];
-        const filteredUsers = users.filter(
-          (user) => user.lastName !== firstUser?.lastName || user.homeCity !== firstUser?.homeCity
-        );
-
-        if (filteredUsers.length > 0) {
-          setUsers(filteredUsers);
-          addAvatarMessage(`Are you ${guestName} ${filteredUsers[0].lastName} from ${filteredUsers[0].homeCity}?`);
-        } else {
-          addAvatarMessage(AUTH_FAILURE_PROMPT);
-          resetAuthChallenge();
-        }
-        return;
-      }
-
-      addAvatarMessage("I don't understand. Please be more concise.");
-      return;
-    }
-
-    if (!currentAuthProp) {
-      await askNextAuthQuestion(users, authProperties);
-      return;
-    }
-
-    if (nextMessage.length > getLimit(currentAuthProp)) {
-      addAvatarMessage("I don't understand. Please be more concise.");
-      return;
-    }
-
-    const filteredUsers = users.filter((user) => {
-      const expectedValue = user[currentAuthProp];
-      return expectedValue ? nextMessage.toLowerCase().includes(expectedValue.toLowerCase()) : false;
-    });
-
-    setUsers(filteredUsers);
-    await askNextAuthQuestion(filteredUsers, authProperties);
-  };
-
-  const sendChatMessage = async (nextMessage: string) => {
-    const updatedHistory: ConversationTurn[] = [
-      ...conversationHistory,
-      { role: 'user', content: nextMessage },
-    ];
-
-    const response = await fetch('https://www.chatcamille.ai/api/chat', {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        message: nextMessage,
-        avatar: selectedAvatar.label,
-        userId: person?._id || null,
-        userName: guestName || 'Guest',
-        sessionName: guestName || 'Guest',
-        authenticated,
-        conversationHistory: updatedHistory,
-        packages: person?.user?.packages || [],
-        srxState,
-        srxType: null,
-      }),
-    });
-
-    const responseJson = (await response.json().catch(() => ({}))) as ChatApiResponse;
-
-    if (!response.ok) {
-      throw new Error(`BOTCierge request failed with ${response.status}`);
-    }
-
-    const reply = normalizeAvatarMessage(responseJson.reply || 'I received that, but I do not have a response yet.');
-
-    if (responseJson.srxState !== undefined) {
-      setSrxState(responseJson.srxState);
-    }
-
-    setConversationHistory([...updatedHistory, { role: 'assistant', content: reply }]);
-
-    if (responseJson.emotion) {
-      avatarWebViewRef.current?.setMood(responseJson.emotion);
-    }
-
-    if (responseJson.type === 'authentication') {
-      if (authenticated) {
-        addAvatarMessage('You\'re already logged in.');
-        return;
-      }
-
-      if (!responseJson.data?.length) {
-        addAvatarMessage(REGISTRATION_PROMPT);
-        return;
-      }
-
-      setUsers(responseJson.data as CandidateUser[]);
-      setAuthProperties(AUTH_PROPERTIES);
-      setCurrentAuthProp(null);
-      setChatStep("auth");
-      addAvatarMessage(`Are you ${guestName} ${(responseJson.data as CandidateUser[])[0].lastName} from ${(responseJson.data as CandidateUser[])[0].homeCity}?`);
-      return;
-    }
-
-    addAvatarMessage(reply);
+  const handleSelectBackground = (id: string) => {
+    setSelectedBackgroundId(id);
+    avatarWebViewRef.current?.setBackground(id);
   };
 
   const sendMessage = async () => {
     const nextMessage = input.trim();
+    if (!nextMessage || isReplying) return;
 
-    if (!nextMessage || isReplying) {
+    addMessage({ id: `${Date.now()}`, message: nextMessage, me: true });
+    setInput('');
+
+    if (chatStep === 'name') {
+      handleNameMessage(nextMessage);
       return;
     }
 
-    setMessages((currentMessages) => [
-      ...currentMessages,
-      {
-        id: `${Date.now()}`,
-        message: nextMessage,
-        me: true,
-      },
-    ]);
-    setInput("");
-
-    if (chatStep === "name") {
-      if (!/^[A-Za-z0-9' ]+\??$/.test(nextMessage)) {
-        addAvatarMessage("Invalid name");
-        return;
-      }
-
-      if (nextMessage.includes(" ")) {
-        const lastWord = nextMessage.split(" ").pop() || nextMessage;
-        addAvatarMessage(`${lastWord}, your name cannot contain spaces.`);
-        return;
-      }
-
-      setGuestName(nextMessage);
-      setChatStep("intent");
-      addAvatarMessage(`Hi ${nextMessage}, welcome to the BOTCierge experience. How may I assist you?`);
-      return;
-    }
-
-    if (chatStep === "auth") {
+    if (chatStep === 'auth') {
       setIsReplying(true);
-
       try {
         await handleAuthMessage(nextMessage);
-      } catch (error) {
-        addAvatarMessage(
-          error instanceof Error
-            ? error.message
-            : AUTH_FAILURE_PROMPT
-        );
+      } catch (err) {
+        addAvatarMessage(err instanceof Error ? err.message : AUTH_FAILURE_PROMPT);
         resetAuthChallenge();
       } finally {
         setIsReplying(false);
       }
-
       return;
     }
 
     setIsReplying(true);
-
     try {
-      await sendChatMessage(nextMessage);
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "I could not reach BOTCierge right now. Please try again.";
+      const result = await sendChatMutate(nextMessage);
+      if (result.srxState !== undefined) setSrxState(result.srxState);
+      if (result.emotion) avatarWebViewRef.current?.setMood(result.emotion);
 
-      addAvatarMessage(message);
+      const reply = normalizeAvatarMessage(result.reply || 'I received that, but I do not have a response yet.');
+
+      if (result.type === 'authentication') {
+        if (authenticated) {
+          addAvatarMessage("You're already logged in.");
+          return;
+        }
+        if (!(result.data as CandidateUser[] | null)?.length) {
+          addAvatarMessage(REGISTRATION_PROMPT);
+          return;
+        }
+        const authData = result.data as CandidateUser[];
+        setUsers(authData);
+        setChatStoreAuthProperties(AUTH_PROPERTIES);
+        setChatStoreCurrentAuthProp(null);
+        setChatStep('auth');
+        addAvatarMessage(`Are you ${guestName} ${authData[0].lastName} from ${authData[0].homeCity}?`);
+        return;
+      }
+
+      addAvatarMessage(reply);
+    } catch (err) {
+      addAvatarMessage(
+        err instanceof Error ? err.message : 'I could not reach BOTCierge right now. Please try again.'
+      );
     } finally {
       setIsReplying(false);
     }
   };
-
-
-  useEffect(() => {
-    const availableVoices =
-      selectedAvatar?.voices && selectedAvatar.voices.length > 0
-        ? selectedAvatar.voices
-        : selectedAvatar?.voice
-          ? [selectedAvatar.voice]
-          : [];
-
-    if (!availableVoices.length) {
-      setSelectedVoiceId(null);
-      return;
-    }
-
-    setSelectedVoiceId((currentVoiceId) => {
-      if (currentVoiceId && availableVoices.some((voiceOption) => voiceOption.id === currentVoiceId)) {
-        return currentVoiceId;
-      }
-
-      return selectedAvatar?.defaultVoiceId || selectedAvatar?.voice?.id || availableVoices[0].id;
-    });
-  }, [selectedAvatar?.defaultVoiceId, selectedAvatar?.id, selectedAvatar?.voice, selectedAvatar?.voices]);
-
-
-  useEffect(() => {
-    avatarWebViewRef.current?.setMood(selectedEmotionId);
-  }, [selectedEmotionId]);
-
-  useEffect(() => {
-    mmkvStorage.setString('selectedBackgroundId', selectedBackgroundId);
-  }, [selectedBackgroundId]);
-
-  useEffect(() => {
-    avatarWebViewRef.current?.setBackground(selectedBackgroundId);
-  }, [selectedBackgroundId]);
-
-  useEffect(() => {
-    if (!activeSpeech?.text) {
-      return;
-    }
-
-    if (lastDispatchedSpeechIdRef.current === activeSpeech.id) {
-      return;
-    }
-
-    lastDispatchedSpeechIdRef.current = activeSpeech.id;
-
-    let isCancelled = false;
-
-    const run = async () => {
-      try {
-        const cached = await getCachedSpeech(activeSpeech.text, selectedAvatar.id, selectedVoice?.id);
-
-        let payload = cached;
-
-        if (!payload) {
-          const response = await fetch(SPEECH_SYNTHESIS_ENDPOINT, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              text: activeSpeech.text,
-              avatar: selectedAvatar.id,
-              mood: selectedEmotionId,
-              voiceId: selectedVoice?.id,
-              voiceLabel: selectedVoice?.label,
-            }),
-          });
-
-          const responsePayload = await response.json().catch(() => ({}));
-
-          if (!response.ok) {
-            throw new Error(responsePayload?.error || responsePayload?.message || `Avatar speech service failed with ${response.status}`);
-          }
-
-          payload = responsePayload;
-          cacheSpeech(activeSpeech.text, selectedAvatar.id, selectedVoice?.id, responsePayload);
-        }
-
-        if (isCancelled) {
-          return;
-        }
-
-        avatarWebViewRef.current?.speakAudio({
-          text: activeSpeech.text,
-          avatar: selectedAvatar.label,
-          mood: selectedEmotionId,
-          voiceId: selectedVoice?.id,
-          voiceLabel: selectedVoice?.label,
-          audioBase64: payload!.audioBase64,
-          words: payload!.words,
-          wordTimes: payload!.wordTimes,
-          wordDurations: payload!.wordDurations,
-          visemes: payload!.visemes,
-          visemeTimes: payload!.visemeTimes,
-          visemeDurations: payload!.visemeDurations,
-        });
-      } catch (error) {
-        if (isCancelled) {
-          return;
-        }
-
-        console.log("[HomeScreen][AvatarWebView][speech-error]", error);
-        lastDispatchedSpeechIdRef.current = null;
-        advanceSpeechQueue();
-      }
-    };
-
-    void run();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [
-    activeSpeech?.id,
-    activeSpeech?.text,
-    advanceSpeechQueue,
-    selectedAvatar.id,
-    selectedAvatar.label,
-    selectedEmotionId,
-    selectedVoice?.id,
-    selectedVoice?.label,
-  ]);
-
-  // TASK-11: While item[0] is speaking, prefetch TTS for item[1] so it plays instantly on queue advance.
-  const nextSpeech = speechQueue[1] ?? null;
-  useEffect(() => {
-    if (!nextSpeech?.text) return;
-
-    let isCancelled = false;
-
-    const prefetch = async () => {
-      const cached = await getCachedSpeech(nextSpeech.text, selectedAvatar.id, selectedVoice?.id);
-      if (cached || isCancelled) return;
-
-      try {
-        const response = await fetch(SPEECH_SYNTHESIS_ENDPOINT, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            text: nextSpeech.text,
-            avatar: selectedAvatar.id,
-            mood: selectedEmotionId,
-            voiceId: selectedVoice?.id,
-            voiceLabel: selectedVoice?.label,
-          }),
-        });
-        if (!response.ok || isCancelled) return;
-        const payload = await response.json().catch(() => null);
-        if (payload && !isCancelled) {
-          cacheSpeech(nextSpeech.text, selectedAvatar.id, selectedVoice?.id, payload);
-        }
-      } catch {
-        // prefetch best-effort, ignore errors
-      }
-    };
-
-    void prefetch();
-    return () => { isCancelled = true; };
-  }, [
-    nextSpeech?.id,
-    nextSpeech?.text,
-    selectedAvatar.id,
-    selectedEmotionId,
-    selectedVoice?.id,
-    selectedVoice?.label,
-  ]);
 
   return (
     <View style={styles.screen}>
@@ -852,7 +469,7 @@ export default function HomeScreen() {
             style={styles.chatScroller}
             contentContainerStyle={styles.chatContent}
           >
-            {messages.map((message) => {
+            {displayMessages.map((message) => {
               return (
                 <View
                   key={message.id}
@@ -995,7 +612,7 @@ export default function HomeScreen() {
               }))}
               labelField="label"
               maxHeight={240}
-              onChange={(item) => setSelectedEmotionId(item.value)}
+              onChange={(item) => handleSelectEmotion(item.value)}
               placeholder="Select emotion"
               selectedTextStyle={styles.dropdownSelectedText}
               style={styles.dropdown}
@@ -1030,7 +647,7 @@ export default function HomeScreen() {
             </Text>
             <View style={styles.bgCategoryRow}>
               <Pressable
-                onPress={() => setActiveBgCategory((c) => (c === "scenes" ? null : "scenes"))}
+                onPress={() => setActiveBgCategory(activeBgCategory === "scenes" ? null : "scenes")}
                 style={[styles.bgCategoryBtn, activeBgCategory === "scenes" && styles.bgCategoryBtnActive]}
               >
                 <Text allowFontScaling={false} style={[styles.bgCategoryBtnText, activeBgCategory === "scenes" && styles.bgCategoryBtnTextActive]}>
@@ -1038,7 +655,7 @@ export default function HomeScreen() {
                 </Text>
               </Pressable>
               <Pressable
-                onPress={() => setActiveBgCategory((c) => (c === "cities" ? null : "cities"))}
+                onPress={() => setActiveBgCategory(activeBgCategory === "cities" ? null : "cities")}
                 style={[styles.bgCategoryBtn, activeBgCategory === "cities" && styles.bgCategoryBtnActive]}
               >
                 <Text allowFontScaling={false} style={[styles.bgCategoryBtnText, activeBgCategory === "cities" && styles.bgCategoryBtnTextActive]}>
@@ -1054,7 +671,7 @@ export default function HomeScreen() {
                 contentContainerStyle={styles.bgGalleryContent}
               >
                 {activeBgCategory === "scenes" && (
-                  <Pressable onPress={() => setSelectedBackgroundId("none")} style={styles.bgThumbWrap}>
+                  <Pressable onPress={() => handleSelectBackground("none")} style={styles.bgThumbWrap}>
                     <View style={[styles.bgThumb, styles.bgNoneThumb, selectedBackgroundId === "none" && styles.bgThumbSelected]}>
                       <Text allowFontScaling={false} style={styles.bgNoneText}>✕</Text>
                     </View>
@@ -1062,7 +679,7 @@ export default function HomeScreen() {
                   </Pressable>
                 )}
                 {BACKGROUND_OPTIONS.filter((opt) => opt.category === activeBgCategory).map((bg) => (
-                  <Pressable key={bg.id} onPress={() => setSelectedBackgroundId(bg.id)} style={styles.bgThumbWrap}>
+                  <Pressable key={bg.id} onPress={() => handleSelectBackground(bg.id)} style={styles.bgThumbWrap}>
                     {bg.source ? (
                       <Image source={bg.source} style={[styles.bgThumb, selectedBackgroundId === bg.id && styles.bgThumbSelected]} />
                     ) : (
