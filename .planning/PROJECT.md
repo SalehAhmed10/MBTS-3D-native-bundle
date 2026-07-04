@@ -120,6 +120,16 @@ From codebase map + web version reference:
 - **Asset delivery:** `avatar-embed/` is the Vercel deployment root (`https://mbts-3-d-native-bundle.vercel.app/`). `src/services/avatarBundleManager.js` downloads the core bundle + backgrounds on first launch and each avatar GLB lazily on first selection, caching everything to `FileSystem.documentDirectory`. Same code path on Android and iOS — no native asset bundling step.
 - **Build:** `scripts/build-avatar-embed.mjs` rebuilds the WebView bundle when avatar-embed/ changes; deploy to Vercel to publish an update; bump `BUNDLE_VERSION` in avatarBundleManager.js to force clients to re-download
 
+## Web Reference (chatcamille.ai)
+
+Live at `https://www.chatcamille.ai/` — out of scope to build (separate contract), used as the parity reference only. Confirmed via screenshot 2026-07-04:
+
+- **4 avatars shown, not 5:** Camille, Prithi, Benjamin, John. No Margie on the reference site — mobile's Margie (AV-01) is going beyond current web parity, not matching proven-working reference behavior.
+- **Matches mobile already:** Scenes/Cities background category split, chat-based login ("Say 'login' in chat to sign in").
+- **Gaps mobile doesn't have (not in current scope, noted for awareness):**
+  - 3D/2D avatar type toggle — web has both render modes, mobile is 3D-only
+  - "Activity Ledger" panel — not referenced anywhere in REQUIREMENTS.md
+
 ---
 
 ## Evolution
